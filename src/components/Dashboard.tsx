@@ -21,7 +21,9 @@ import {
   Loader2,
   ListPlus,
   X,
-  Info
+  Info,
+  Sparkles,
+  Disc
 } from "lucide-react";
 import Button from "./ui/button";
 import Input from "./ui/input";
@@ -78,6 +80,39 @@ const InstagramIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const TRENDING_HITS = [
+  { title: "After Party", artist: "Don Toliver" },
+  { title: "FE!N", artist: "Travis Scott" },
+  { title: "Blinding Lights", artist: "The Weeknd" },
+  { title: "L'AMOUR DE MA VIE", artist: "Billie Eilish" },
+  { title: "MILLION DOLLAR BABY", artist: "Tommy Richman" },
+  { title: "Beautiful Things", artist: "Benson Boone" },
+  { title: "I Like The Way You Kiss Me", artist: "Artemas" },
+  { title: "Espresso", artist: "Sabrina Carpenter" },
+  { title: "Good Luck, Babe!", artist: "Chappell Roan" },
+  { title: "Not Like Us", artist: "Kendrick Lamar" },
+  { title: "One Dance", artist: "Drake" },
+  { title: "BAND4BAND", artist: "Central Cee" },
+  { title: "BIRDS OF A FEATHER", artist: "Billie Eilish" },
+  { title: "Starboy", artist: "The Weeknd" },
+  { title: "Bandit", artist: "Don Toliver" },
+  { title: "Goosebumps", artist: "Travis Scott" },
+  { title: "Like That", artist: "Future" },
+  { title: "Too Sweet", artist: "Hozier" },
+  { title: "End of Beginning", artist: "Djo" },
+  { title: "Lose Control", artist: "Teddy Swims" },
+  { title: "Lovin On Me", artist: "Jack Harlow" },
+  { title: "Paint The Town Red", artist: "Doja Cat" },
+  { title: "Houdini", artist: "Dua Lipa" },
+  { title: "fukumean", artist: "Gunna" },
+  { title: "I'm Good (Blue)", artist: "David Guetta" },
+  { title: "Calm Down", artist: "Rema" },
+  { title: "Flowers", artist: "Miley Cyrus" },
+  { title: "Stargirl Interlude", artist: "The Weeknd" },
+  { title: "Popular", artist: "The Weeknd" },
+  { title: "Cruel Summer", artist: "Taylor Swift" }
+];
+
 interface DashboardProps {
   initialSession: any;
 }
@@ -85,31 +120,19 @@ interface DashboardProps {
 export default function Dashboard({ initialSession }: DashboardProps) {
   // --- STATE ---
   const [session, setSession] = useState(initialSession);
-  const [activeTab, setActiveTab] = useState<"discover" | "collections" | "favorites">("discover");
+  const [activeTab, setActiveTab] = useState<"discover" | "collections" | "favorites" | "roulette">("discover");
   const [searchQuery, setSearchQuery] = useState("");
   const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
   const [loading, setLoading] = useState(false);
   
   // Son aramalar geçmişi
-  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("vsh_recent_searches");
-      return saved ? JSON.parse(saved) : [];
-    }
-    return [];
-  });
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   
   // Veritabanı ve Yerel Depolama (Fallback) State'leri
   const [collections, setCollections] = useState<DBCollection[]>([]);
   const [favorites, setFavorites] = useState<DBFavorite[]>([]);
   const [isLocalMode, setIsLocalMode] = useState(false);
-  const [dbNoticeShown, setDbNoticeShown] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("vsh_hide_db_notice");
-      return saved !== "true";
-    }
-    return true;
-  });
+  const [dbNoticeShown, setDbNoticeShown] = useState(true);
 
   // Modallar
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -137,6 +160,20 @@ export default function Dashboard({ initialSession }: DashboardProps) {
   const [tiktokResolveError, setTiktokResolveError] = useState("");
   const [resolvingTrackId, setResolvingTrackId] = useState<string | null>(null);
   const [resolvingInstagramTrackId, setResolvingInstagramTrackId] = useState<string | null>(null);
+
+  // Çözümlenmiş sesler için önbellek (caching)
+  const [resolvedCache, setResolvedCache] = useState<Record<string, {
+    customPreviewUrl?: string;
+    tiktokVideoUrl?: string;
+    instagramAudioUrl?: string;
+    instagramVideoUrl?: string;
+  }>>({});
+
+  // Viral Rulet State'leri
+  const [spinning, setSpinning] = useState(false);
+  const [rouletteTrack, setRouletteTrack] = useState<SpotifyTrack | null>(null);
+  const [rouletteError, setRouletteError] = useState("");
+  const [resolvingRouletteTikTok, setResolvingRouletteTikTok] = useState(false);
 
   // Ses Oynatıcı (Audio Player) State'leri
   const [currentTrack, setCurrentTrack] = useState<SpotifyTrack | null>(null);
@@ -172,6 +209,23 @@ export default function Dashboard({ initialSession }: DashboardProps) {
     audioRef.current = new Audio();
     audioRef.current.volume = volume;
 
+    // Yerel verileri (son aramalar, dbNotice) tarayıcı ortamında güvenle yükle (SSR Hydration hatasını önlemek için)
+    if (typeof window !== "undefined") {
+      const savedSearches = localStorage.getItem("vsh_recent_searches");
+      if (savedSearches) {
+        try {
+          setRecentSearches(JSON.parse(savedSearches));
+        } catch (e) {
+          console.error("Son aramalar yüklenirken hata oluştu:", e);
+        }
+      }
+
+      const savedNotice = localStorage.getItem("vsh_hide_db_notice");
+      if (savedNotice === "true") {
+        setDbNoticeShown(false);
+      }
+    }
+
     // Ses dinleyicileri
     const audio = audioRef.current;
     
@@ -191,7 +245,6 @@ export default function Dashboard({ initialSession }: DashboardProps) {
     };
   }, []);
 
-  // Ses seviyesini güncelleme
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = isMuted ? 0 : volume;
@@ -206,8 +259,6 @@ export default function Dashboard({ initialSession }: DashboardProps) {
     const targetSourceMode = sourceMode || 
       (track.instagramAudioUrl ? "instagram" : 
       (track.customPreviewUrl ? "tiktok" : "spotify"));
-    
-    setAudioSourceMode(targetSourceMode);
 
     let audioSource = track.previewUrl;
     if (targetSourceMode === "tiktok" && track.customPreviewUrl) {
@@ -216,7 +267,8 @@ export default function Dashboard({ initialSession }: DashboardProps) {
       audioSource = track.instagramAudioUrl;
     }
 
-    if (currentTrack?.id === track.id && (!sourceMode || sourceMode === audioSourceMode)) {
+    // Eğer şu an çalınan şarkı ile hedef şarkı aynıysa VE çalınan kaynak modu ile hedef kaynak modu aynıysa duraklat/devam et
+    if (currentTrack?.id === track.id && targetSourceMode === audioSourceMode) {
       if (isPlaying) {
         audioRef.current.pause();
         setIsPlaying(false);
@@ -225,7 +277,9 @@ export default function Dashboard({ initialSession }: DashboardProps) {
         setIsPlaying(true);
       }
     } else {
-      audioRef.current.src = audioSource;
+      // Kaynak modu veya şarkı değiştiğinde yeni kaynağı yükle ve çal
+      setAudioSourceMode(targetSourceMode);
+      audioRef.current.src = audioSource || "";
       audioRef.current.load();
       audioRef.current.play()
         .then(() => {
@@ -811,6 +865,36 @@ export default function Dashboard({ initialSession }: DashboardProps) {
 
     setResolvingTrackId(track.id);
     setTiktokResolveError("");
+
+    // Önce önbelleği kontrol et
+    if (resolvedCache[track.id]?.customPreviewUrl) {
+      const cachedUrl = resolvedCache[track.id].customPreviewUrl!;
+      const cachedVideoUrl = resolvedCache[track.id].tiktokVideoUrl || "";
+      
+      const updatedTrack: SpotifyTrack = {
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        albumArt: track.albumArt || "",
+        previewUrl: track.previewUrl || "",
+        customPreviewUrl: cachedUrl,
+        tiktokVideoUrl: cachedVideoUrl,
+        tiktokUrl: `https://www.google.com/search?q=site:tiktok.com/music+${encodeURIComponent(`${track.artist} - ${track.title}`)}&btnI=I`
+      };
+
+      if (currentTrack?.id === track.id) {
+        setCurrentTrack(updatedTrack);
+        if (isPlaying && audioRef.current) {
+          audioRef.current.src = cachedUrl;
+          audioRef.current.load();
+          audioRef.current.play().catch(() => {});
+        }
+      } else {
+        playTrack(updatedTrack, "tiktok");
+      }
+      setResolvingTrackId(null);
+      return;
+    }
     
     try {
       // 1. TikTok'ta otomatik arama yap
@@ -837,6 +921,16 @@ export default function Dashboard({ initialSession }: DashboardProps) {
 
       const { playUrl, videoUrl } = resolved;
       const { id, type, collectionId } = track;
+
+      // Önbelleğe kaydet
+      setResolvedCache(prev => ({
+        ...prev,
+        [id]: {
+          ...prev[id],
+          customPreviewUrl: playUrl,
+          tiktokVideoUrl: videoUrl
+        }
+      }));
 
       // 2. Veritabanına veya LocalStorage'a kaydet
       if (isLocalMode) {
@@ -953,6 +1047,36 @@ export default function Dashboard({ initialSession }: DashboardProps) {
 
     setResolvingInstagramTrackId(track.id);
     setTiktokResolveError("");
+
+    // Önce önbelleği kontrol et
+    if (resolvedCache[track.id]?.instagramAudioUrl) {
+      const cachedUrl = resolvedCache[track.id].instagramAudioUrl!;
+      const cachedVideoUrl = resolvedCache[track.id].instagramVideoUrl || "";
+      
+      const updatedTrack: SpotifyTrack = {
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        albumArt: track.albumArt || "",
+        previewUrl: track.previewUrl || "",
+        instagramAudioUrl: cachedUrl,
+        instagramVideoUrl: cachedVideoUrl,
+        tiktokUrl: `https://www.google.com/search?q=site:tiktok.com/music+${encodeURIComponent(`${track.artist} - ${track.title}`)}&btnI=I`
+      };
+
+      if (currentTrack?.id === track.id) {
+        setCurrentTrack(updatedTrack);
+        if (isPlaying && audioRef.current && audioSourceMode === "instagram") {
+          audioRef.current.src = cachedUrl;
+          audioRef.current.load();
+          audioRef.current.play().catch(() => {});
+        }
+      } else {
+        playTrack(updatedTrack, "instagram");
+      }
+      setResolvingInstagramTrackId(null);
+      return;
+    }
     
     try {
       // 1. Instagram Reels'te otomatik arama yap
@@ -979,6 +1103,16 @@ export default function Dashboard({ initialSession }: DashboardProps) {
 
       const { playUrl, videoUrl } = resolved;
       const { id, type, collectionId } = track;
+
+      // Önbelleğe kaydet
+      setResolvedCache(prev => ({
+        ...prev,
+        [id]: {
+          ...prev[id],
+          instagramAudioUrl: playUrl,
+          instagramVideoUrl: videoUrl
+        }
+      }));
 
       // 2. Veritabanına veya LocalStorage'a kaydet
       if (isLocalMode) {
@@ -1078,6 +1212,80 @@ export default function Dashboard({ initialSession }: DashboardProps) {
     }
   };
 
+  // Viral Rulet Çevirme Eylemi
+  const handleSpinRoulette = async () => {
+    if (spinning) return;
+    
+    setSpinning(true);
+    setRouletteTrack(null);
+    setRouletteError("");
+    setResolvingRouletteTikTok(false);
+    
+    // Oynatıcıyı durdur
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+    
+    try {
+      // 1. TRENDING_HITS listesinden rastgele bir şarkı seç
+      const randomIndex = Math.floor(Math.random() * TRENDING_HITS.length);
+      const chosen = TRENDING_HITS[randomIndex];
+      
+      console.log(`[Viral Rulet] Çevriliyor... Seçilen Hedef: ${chosen.artist} - ${chosen.title}`);
+      
+      // 2. Arka planda Spotify/iTunes üzerinden gerçek metadata bilgilerini ara
+      const searchResults = await searchTracks(`${chosen.artist} ${chosen.title}`);
+      
+      // En az 2.2 saniye dönme efekti hissi yaratmak için yapay gecikme
+      await new Promise(resolve => setTimeout(resolve, 2200));
+      
+      if (!searchResults || searchResults.length === 0) {
+        setRouletteError("Müzik kütüphanesinden şarkı bilgileri yüklenemedi. Lütfen tekrar çevirmeyi deneyin.");
+        setSpinning(false);
+        return;
+      }
+      
+      const matchedTrack = searchResults[0];
+      setRouletteTrack(matchedTrack);
+      
+      // 3. Arka planda TikTok ses linkini otomatik çözmeyi dene (Kullanıcıya mükemmel deneyim için!)
+      setResolvingRouletteTikTok(true);
+      
+      const resolved = await autoResolveTikTokAudio(matchedTrack.title, matchedTrack.artist);
+      
+      if (resolved && resolved.playUrl) {
+        const finalTrack: SpotifyTrack = {
+          ...matchedTrack,
+          customPreviewUrl: resolved.playUrl,
+          tiktokVideoUrl: resolved.videoUrl
+        };
+        
+        // UI cache'e kaydet
+        setResolvedCache(prev => ({
+          ...prev,
+          [matchedTrack.id]: {
+            ...prev[matchedTrack.id],
+            customPreviewUrl: resolved.playUrl,
+            tiktokVideoUrl: resolved.videoUrl
+          }
+        }));
+        
+        setRouletteTrack(finalTrack);
+        playTrack(finalTrack, "tiktok");
+      } else {
+        // TikTok bulunamazsa varsayılan önizleme (Spotify/iTunes) sesini çal
+        playTrack(matchedTrack, "spotify");
+      }
+    } catch (err: any) {
+      console.error("Viral Rulet hatası:", err);
+      setRouletteError("Beklenmedik bir hata oluştu. Lütfen tekrar deneyin.");
+    } finally {
+      setSpinning(false);
+      setResolvingRouletteTikTok(false);
+    }
+  };
+
   // Saniye Cinsinden Süreyi Dakika:Saniye Formatına Dönüştürme
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -1088,27 +1296,28 @@ export default function Dashboard({ initialSession }: DashboardProps) {
   return (
     <div className="flex-1 flex flex-col pb-32">
       {/* --- ÜST BAR (NAVBAR) --- */}
-      <header className="sticky top-0 z-40 w-full glass-panel border-b border-white/5 bg-background/80 backdrop-blur-md px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-4 z-40 mx-auto w-[96%] max-w-7xl rounded-2xl border border-white/10 bg-[#050409]/60 backdrop-blur-xl px-6 py-3 flex items-center justify-between shadow-[0_15px_50px_rgba(0,0,0,0.6),0_0_30px_rgba(168,85,247,0.08)] transition-all duration-300 hover:border-white/15">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#ff0050] to-[#a855f7] flex items-center justify-center animate-pulse-glow">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#ff0050] via-[#a855f7] to-[#00f2fe] flex items-center justify-center animate-pulse-glow shadow-[0_0_15px_rgba(168,85,247,0.4)]">
             <Music className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
-              ViralSound <span className="text-xs bg-gradient-to-r from-primary to-cyan-glow text-transparent bg-clip-text font-extrabold uppercase">Hub</span>
+            <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-1.5 font-sans">
+              <span className="bg-gradient-to-r from-white via-gray-100 to-gray-300 text-transparent bg-clip-text">ViralSound</span>
+              <span className="text-xs bg-gradient-to-r from-[#ff0050] via-[#a855f7] to-[#00f2fe] text-transparent bg-clip-text font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/5 border border-white/5">HUB</span>
             </h1>
-            <p className="text-[10px] text-gray-400">15-30s Hit Preview Aggregator</p>
+            <p className="text-[9px] text-gray-400 font-extrabold uppercase tracking-widest leading-none mt-0.5">Studio & Social Media Hits</p>
           </div>
         </div>
 
         {/* Sekme Değiştirici */}
-        <nav className="hidden md:flex items-center gap-1 bg-white/5 border border-white/10 p-1 rounded-xl">
+        <nav className="hidden md:flex items-center gap-1.5 bg-white/5 border border-white/5 p-1 rounded-xl">
           <button
             onClick={() => setActiveTab("discover")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all duration-300 ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               activeTab === "discover"
-                ? "bg-primary text-white font-medium"
-                : "text-gray-400 hover:text-white"
+                ? "bg-gradient-to-r from-primary to-purple-600 text-white font-black shadow-[0_4px_15px_rgba(168,85,247,0.3)] scale-[1.02]"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
             }`}
           >
             <Compass className="h-4 w-4" /> Keşfet
@@ -1118,10 +1327,10 @@ export default function Dashboard({ initialSession }: DashboardProps) {
               if (!session) setIsLoginOpen(true);
               else setActiveTab("collections");
             }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all duration-300 ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               activeTab === "collections"
-                ? "bg-primary text-white font-medium"
-                : "text-gray-400 hover:text-white"
+                ? "bg-gradient-to-r from-primary to-purple-600 text-white font-black shadow-[0_4px_15px_rgba(168,85,247,0.3)] scale-[1.02]"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
             }`}
           >
             <ListPlus className="h-4 w-4" /> Koleksiyonlarım
@@ -1131,13 +1340,23 @@ export default function Dashboard({ initialSession }: DashboardProps) {
               if (!session) setIsLoginOpen(true);
               else setActiveTab("favorites");
             }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all duration-300 ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               activeTab === "favorites"
-                ? "bg-primary text-white font-medium"
-                : "text-gray-400 hover:text-white"
+                ? "bg-gradient-to-r from-primary to-purple-600 text-white font-black shadow-[0_4px_15px_rgba(168,85,247,0.3)] scale-[1.02]"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
             }`}
           >
             <FolderHeart className="h-4 w-4" /> Favorilerim
+          </button>
+          <button
+            onClick={() => setActiveTab("roulette")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+              activeTab === "roulette"
+                ? "bg-gradient-to-r from-[#ff0050] to-[#a855f7] text-white font-black shadow-[0_4px_15px_rgba(255,0,80,0.3)] animate-pulse-glow scale-[1.02]"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <Sparkles className="h-4 w-4" /> Viral Rulet
           </button>
         </nav>
 
@@ -1146,13 +1365,13 @@ export default function Dashboard({ initialSession }: DashboardProps) {
           {session ? (
             <div className="flex items-center gap-3">
               <div className="hidden lg:flex flex-col text-right">
-                <span className="text-sm font-semibold text-white">{session.user.name}</span>
-                <span className="text-[10px] text-gray-400">{session.user.email}</span>
+                <span className="text-xs font-black text-white">{session.user.name}</span>
+                <span className="text-[9px] text-gray-400 font-medium">{session.user.email}</span>
               </div>
-              <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-primary">
+              <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-primary shadow-[inset_0_0_10px_rgba(168,85,247,0.1)]">
                 <User className="h-4 w-4" />
               </div>
-              <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 text-gray-400 hover:text-red-500">
+              <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 text-gray-400 hover:text-red-500 cursor-pointer hover:bg-red-500/10 rounded-xl">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
@@ -1160,7 +1379,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
             <Button
               variant="primary"
               onClick={() => setIsLoginOpen(true)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ff0050] to-[#a855f7] hover:scale-105 transition-all text-xs font-bold uppercase tracking-wider cursor-pointer shadow-[0_4px_15px_rgba(255,0,80,0.2)]"
             >
               <LogIn className="h-4 w-4" /> Giriş Yap
             </Button>
@@ -1199,6 +1418,14 @@ export default function Dashboard({ initialSession }: DashboardProps) {
           }`}
         >
           <FolderHeart className="h-3.5 w-3.5" /> Favoriler
+        </button>
+        <button
+          onClick={() => setActiveTab("roulette")}
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold ${
+            activeTab === "roulette" ? "bg-gradient-to-r from-[#ff0050] to-[#a855f7] text-white" : "text-gray-400"
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5" /> Rulet
         </button>
       </div>
 
@@ -1313,15 +1540,15 @@ export default function Dashboard({ initialSession }: DashboardProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {tracks.map((track) => {
                     const favRecord = favorites.find(f => f.spotifyId === track.id);
-                    const hasCustomTikTok = !!favRecord?.customPreviewUrl;
-                    const hasCustomInstagram = !!favRecord?.instagramAudioUrl;
+                    const hasCustomTikTok = !!favRecord?.customPreviewUrl || !!resolvedCache[track.id]?.customPreviewUrl;
+                    const hasCustomInstagram = !!favRecord?.instagramAudioUrl || !!resolvedCache[track.id]?.instagramAudioUrl;
                     
                     const playbackTrack = { 
                       ...track, 
-                      customPreviewUrl: favRecord?.customPreviewUrl || undefined, 
-                      tiktokVideoUrl: favRecord?.tiktokVideoUrl || undefined,
-                      instagramAudioUrl: favRecord?.instagramAudioUrl || undefined,
-                      instagramVideoUrl: favRecord?.instagramVideoUrl || undefined
+                      customPreviewUrl: favRecord?.customPreviewUrl || resolvedCache[track.id]?.customPreviewUrl || undefined, 
+                      tiktokVideoUrl: favRecord?.tiktokVideoUrl || resolvedCache[track.id]?.tiktokVideoUrl || undefined,
+                      instagramAudioUrl: favRecord?.instagramAudioUrl || resolvedCache[track.id]?.instagramAudioUrl || undefined,
+                      instagramVideoUrl: favRecord?.instagramVideoUrl || resolvedCache[track.id]?.instagramVideoUrl || undefined
                     };
 
                     const active = currentTrack?.id === track.id;
@@ -1557,10 +1784,10 @@ export default function Dashboard({ initialSession }: DashboardProps) {
                             artist: t.artist,
                             albumArt: t.albumArt || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop",
                             previewUrl: t.previewUrl,
-                            customPreviewUrl: t.customPreviewUrl || undefined,
-                            tiktokVideoUrl: t.tiktokVideoUrl || undefined,
-                            instagramAudioUrl: (t as any).instagramAudioUrl || undefined,
-                            instagramVideoUrl: (t as any).instagramVideoUrl || undefined,
+                            customPreviewUrl: t.customPreviewUrl || resolvedCache[t.spotifyId]?.customPreviewUrl || undefined,
+                            tiktokVideoUrl: t.tiktokVideoUrl || resolvedCache[t.spotifyId]?.tiktokVideoUrl || undefined,
+                            instagramAudioUrl: (t as any).instagramAudioUrl || resolvedCache[t.spotifyId]?.instagramAudioUrl || undefined,
+                            instagramVideoUrl: (t as any).instagramVideoUrl || resolvedCache[t.spotifyId]?.instagramVideoUrl || undefined,
                             tiktokUrl: `https://www.google.com/search?q=site:tiktok.com/music+${encodeURIComponent(`${t.artist} - ${t.title}`)}&btnI=I`
                           };
 
@@ -1731,10 +1958,10 @@ export default function Dashboard({ initialSession }: DashboardProps) {
                     artist: fav.artist,
                     albumArt: fav.albumArt || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop",
                     previewUrl: fav.previewUrl,
-                    customPreviewUrl: fav.customPreviewUrl || undefined,
-                    tiktokVideoUrl: fav.tiktokVideoUrl || undefined,
-                    instagramAudioUrl: (fav as any).instagramAudioUrl || undefined,
-                    instagramVideoUrl: (fav as any).instagramVideoUrl || undefined,
+                    customPreviewUrl: fav.customPreviewUrl || resolvedCache[fav.spotifyId]?.customPreviewUrl || undefined,
+                    tiktokVideoUrl: fav.tiktokVideoUrl || resolvedCache[fav.spotifyId]?.tiktokVideoUrl || undefined,
+                    instagramAudioUrl: (fav as any).instagramAudioUrl || resolvedCache[fav.spotifyId]?.instagramAudioUrl || undefined,
+                    instagramVideoUrl: (fav as any).instagramVideoUrl || resolvedCache[fav.spotifyId]?.instagramVideoUrl || undefined,
                     tiktokUrl: `https://www.google.com/search?q=site:tiktok.com/music+${encodeURIComponent(`${fav.artist} - ${fav.title}`)}&btnI=I`
                   };
 
@@ -1863,163 +2090,367 @@ export default function Dashboard({ initialSession }: DashboardProps) {
             )}
           </div>
         )}
+
+        {/* --- 4. VİRAL RULET (VIRAL ROULETTE) SEKME İÇERİĞİ --- */}
+        {activeTab === "roulette" && (
+          <div className="flex flex-col items-center gap-8 py-4">
+            <div className="text-center max-w-xl flex flex-col gap-2 animate-[fadeIn_0.5s_ease-out]">
+              <span className="self-center text-xs font-extrabold tracking-widest text-[#ff0050] uppercase bg-[#ff0050]/10 px-3 py-1 rounded-full border border-[#ff0050]/20 flex items-center gap-1.5 animate-pulse-glow">
+                <Sparkles className="h-3.5 w-3.5 text-[#ff0050]" /> Yeni Özellik
+              </span>
+              <h3 className="text-3xl font-black text-white tracking-tight">Viral Hits Roulette</h3>
+              <p className="text-sm text-gray-400">
+                Sosyal medyanın en popüler hit şarkılarından oluşan özel havuzumuzdan rastgele bir şarkı çekin. TikWM API ile arka planda otomatik olarak TikTok sesi çözülüp çalınır!
+              </p>
+            </div>
+
+            {/* 3D Neon Dönen Plak Arayüzü */}
+            <div className="relative flex items-center justify-center py-6">
+              {/* Plak Dışındaki Parlama Halkası */}
+              <div className={`absolute rounded-full blur-3xl opacity-30 transition-all duration-1000 ${
+                spinning 
+                  ? "bg-gradient-to-tr from-[#ff0050] via-[#a855f7] to-[#00f2fe] scale-110 opacity-60 animate-pulse" 
+                  : isPlaying && currentTrack?.id === rouletteTrack?.id
+                    ? "bg-gradient-to-tr from-[#ff0050] to-[#a855f7] scale-105 opacity-40 animate-pulse"
+                    : "bg-white/5"
+              }`} style={{ width: "320px", height: "320px" }} />
+
+              {/* Plak Gövdesi */}
+              <div 
+                className={`relative w-80 h-80 rounded-full bg-gradient-to-b from-[#111] to-[#000] border-4 border-[#222] shadow-[0_0_50px_rgba(0,0,0,0.8)] flex items-center justify-center overflow-hidden transition-transform duration-500 ${
+                  spinning 
+                    ? "animate-[spin_1s_linear_infinite]" 
+                    : isPlaying && currentTrack?.id === rouletteTrack?.id
+                      ? "animate-[spin_12s_linear_infinite]"
+                      : ""
+                }`}
+              >
+                {/* Plak Kanalları (Vinil Çizgileri) */}
+                <div className="absolute inset-2 rounded-full border border-white/5 opacity-40 pointer-events-none" />
+                <div className="absolute inset-6 rounded-full border border-white/5 opacity-30 pointer-events-none" />
+                <div className="absolute inset-12 rounded-full border border-white/5 opacity-25 pointer-events-none" />
+                <div className="absolute inset-20 rounded-full border border-white/5 opacity-20 pointer-events-none" />
+                <div className="absolute inset-28 rounded-full border border-white/5 opacity-15 pointer-events-none" />
+
+                {/* Plak Ortasındaki Etiket (Label) */}
+                <div className="absolute w-36 h-36 rounded-full bg-[#18181b] border-2 border-white/10 flex items-center justify-center overflow-hidden z-10">
+                  {rouletteTrack ? (
+                    <img 
+                      src={rouletteTrack.albumArt} 
+                      alt={rouletteTrack.title}
+                      className="absolute inset-0 w-full h-full object-cover opacity-70"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-tr from-[#ff0050]/20 to-[#a855f7]/20 flex items-center justify-center">
+                      <Disc className={`h-16 w-16 text-gray-600 ${spinning ? "animate-pulse" : ""}`} />
+                    </div>
+                  )}
+                  {/* Merkez Delik */}
+                  <div className="w-6 h-6 rounded-full bg-[#09090b] border-2 border-white/10 shadow-[inner_0_0_5px_rgba(0,0,0,1)] z-20" />
+                </div>
+              </div>
+            </div>
+
+            {/* Neon Spin Butonu */}
+            <div className="flex flex-col items-center gap-4">
+              <Button
+                variant="primary"
+                onClick={handleSpinRoulette}
+                disabled={spinning}
+                className={`px-8 py-4 rounded-full text-base font-extrabold tracking-wide uppercase transition-all duration-500 ${
+                  spinning
+                    ? "bg-gray-700 text-gray-500 cursor-not-allowed border-transparent"
+                    : "bg-gradient-to-r from-[#ff0050] via-[#a855f7] to-[#00f2fe] text-white border-transparent hover:scale-105 shadow-[0_0_20px_rgba(255,0,80,0.5)] hover:shadow-[0_0_35px_rgba(0,242,254,0.8)]"
+                }`}
+              >
+                {spinning ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" /> Rulet Dönüyor...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 animate-pulse" /> Çevir & Keşfet
+                  </span>
+                )}
+              </Button>
+
+              {rouletteError && (
+                <p className="text-xs font-semibold text-red-400 bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-full mt-2">
+                  {rouletteError}
+                </p>
+              )}
+            </div>
+
+            {/* Kazanan Şarkı Cam Kartı (Glassmorphism Card) */}
+            {rouletteTrack && !spinning && (
+              <div className="w-full max-w-xl glass-panel border border-white/10 rounded-3xl p-6 flex flex-col sm:flex-row items-center gap-6 shadow-[0_0_50px_rgba(168,85,247,0.15)] animate-[slideUp_0.5s_ease-out] relative">
+                {/* Sol Taraf: Albüm Resmi ve Play Buton */}
+                <div className="relative h-28 w-28 rounded-2xl overflow-hidden shadow-2xl shrink-0 group border border-white/10">
+                  <img
+                    src={rouletteTrack.albumArt}
+                    alt={rouletteTrack.title}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-300">
+                    <button
+                      onClick={() => playTrack(rouletteTrack)}
+                      className="h-12 w-12 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-[0_0_15px_rgba(168,85,247,0.5)]"
+                    >
+                      {isPlaying && currentTrack?.id === rouletteTrack.id ? (
+                        <Pause className="h-5 w-5 fill-white" />
+                      ) : (
+                        <Play className="h-5 w-5 fill-white translate-x-[1.5px]" />
+                      )}
+                    </button>
+                  </div>
+                  {isPlaying && currentTrack?.id === rouletteTrack.id && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-[3px]">
+                      <span className="w-1 h-8 bg-primary rounded-full animate-music-bar" style={{ animationDelay: "0.1s" }} />
+                      <span className="w-1 h-8 bg-cyan-glow rounded-full animate-music-bar" style={{ animationDelay: "0.3s" }} />
+                      <span className="w-1 h-8 bg-spotify rounded-full animate-music-bar" style={{ animationDelay: "0.5s" }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Sağ Taraf: Metadatalar ve Aksiyon Butonları */}
+                <div className="flex-1 flex flex-col justify-between w-full h-full gap-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <span className="px-2 py-0.5 text-[9px] font-black rounded-full bg-gradient-to-r from-[#ff0050] to-[#a855f7] text-white animate-pulse shadow-[0_0_8px_rgba(255,0,80,0.3)]">
+                        KAZANAN ŞARKI 🎉
+                      </span>
+                      {resolvingRouletteTikTok && (
+                        <span className="px-2 py-0.5 text-[9px] font-bold rounded-full bg-white/5 border border-white/10 text-cyan-glow flex items-center gap-1">
+                          <Loader2 className="h-2 w-2 animate-spin" /> TikTok Çözülüyor
+                        </span>
+                      )}
+                      {!resolvingRouletteTikTok && rouletteTrack.customPreviewUrl && (
+                        <span className="px-2 py-0.5 text-[9px] font-black rounded-full bg-[#ff0050]/20 border border-[#ff0050]/40 text-[#ff0050] flex items-center gap-1 animate-pulse-glow">
+                          <TikTokIcon className="h-2.5 w-2.5" /> TikTok Sesi Aktif!
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="font-extrabold text-white text-lg leading-tight truncate">
+                      {rouletteTrack.title}
+                    </h4>
+                    <p className="text-sm text-gray-400 truncate mt-0.5">{rouletteTrack.artist}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
+                    {/* Oynat / Durdur */}
+                    <Button
+                      variant="primary"
+                      onClick={() => playTrack(rouletteTrack)}
+                      className="px-4 py-2 text-xs font-bold flex items-center gap-1.5"
+                    >
+                      {isPlaying && currentTrack?.id === rouletteTrack.id ? (
+                        <>
+                          <Pause className="h-3.5 w-3.5" /> Durdur
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-3.5 w-3.5 translate-x-[0.5px]" /> Şimdi Dinle
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Favori Butonu */}
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleToggleFavorite(rouletteTrack)}
+                      className={`h-9 px-3 rounded-xl border border-white/10 flex items-center gap-1.5 text-xs ${
+                        isFavorite(rouletteTrack.id) ? "text-red-500 bg-red-500/10 border-red-500/20" : "text-gray-300 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      <Heart className="h-3.5 w-3.5" fill={isFavorite(rouletteTrack.id) ? "currentColor" : "none"} />
+                      {isFavorite(rouletteTrack.id) ? "Favorilerde" : "Favoriye Ekle"}
+                    </Button>
+
+                    {/* Koleksiyona Ekle Butonu */}
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        if (!session) {
+                          setIsLoginOpen(true);
+                          return;
+                        }
+                        setSelectedTrackToAddToCollection(rouletteTrack);
+                        setIsAddToCollectionOpen(true);
+                      }}
+                      className="h-9 px-3 rounded-xl border border-white/10 flex items-center gap-1.5 text-xs text-gray-300 hover:text-white hover:bg-white/5"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Koleksiyona Ekle
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
-      {/* --- SABİT MODERN SES OYNATICI (BOTTOM AUDIO PLAYER) --- */}
+          {/* --- YÜZEN PREMIUM SES OYNATICI (FLOATING PREMIUM AUDIO PLAYER) --- */}
       {currentTrack && (
-        <div className="fixed bottom-0 inset-x-0 z-50 glass-panel border-t border-white/10 bg-[#06050b]/95 backdrop-blur-xl px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_-15px_40px_rgba(0,0,0,0.7)]">
+        <div className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-7xl z-50 rounded-2xl border border-white/10 bg-[#06050b]/85 backdrop-blur-xl px-6 py-3 md:py-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_40px_rgba(168,85,247,0.12)] hover:border-white/15 transition-all duration-300">
           {/* Sol: Şarkı Ayrıntıları */}
-          <div className="w-full md:w-1/4 flex items-center gap-4">
-            <div className="relative h-14 w-14 rounded-xl overflow-hidden shadow-2xl shrink-0 group border border-white/10">
+          <div className="w-full md:w-1/4 flex items-center gap-4.5 shrink-0">
+            <div className={`relative h-14 w-14 rounded-xl overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.5)] shrink-0 group border border-white/10 transition-all duration-500 ${
+              isPlaying ? "shadow-[0_0_20px_rgba(168,85,247,0.35)] scale-[1.03]" : ""
+            }`}>
               <img
                 src={currentTrack.albumArt}
                 alt={currentTrack.title}
-                className={`h-full w-full object-cover rounded-xl ${
-                  isPlaying ? "animate-[spin_10s_linear_infinite]" : ""
+                className={`h-full w-full object-cover rounded-xl transition-transform duration-500 ${
+                  isPlaying ? "animate-[spin_12s_linear_infinite]" : ""
                 }`}
               />
               <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <Music className="h-5 w-5 text-white" />
+                <Music className="h-5 w-5 text-white animate-pulse" />
               </div>
             </div>
-            <div className="min-w-0 flex flex-col gap-0.5">
-              <div className="flex items-center gap-2">
-                <h4 className="font-extrabold text-white text-sm truncate select-none">
+            <div className="min-w-0 flex flex-col gap-1">
+              <div className="flex items-center flex-wrap gap-2">
+                <h4 className="font-black text-white text-sm tracking-tight truncate select-none font-sans">
                   {currentTrack.title}
                 </h4>
                 {audioSourceMode === "tiktok" && (
-                  <span className="shrink-0 px-2 py-0.5 text-[9px] font-black rounded-full bg-gradient-to-r from-[#ff0050] to-[#00f2fe] text-white animate-pulse shadow-[0_0_8px_rgba(0,242,254,0.5)]">
-                    TIKTOK HIT 🔥
+                  <span className="shrink-0 px-2 py-0.5 text-[8px] font-black rounded-md bg-gradient-to-r from-[#ff0050] to-[#00f2fe] text-white animate-pulse shadow-[0_0_10px_rgba(255,0,80,0.6)] tracking-wider">
+                    TIKTOK 🔥
                   </span>
                 )}
                 {audioSourceMode === "instagram" && (
-                  <span className="shrink-0 px-2 py-0.5 text-[9px] font-black rounded-full bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white animate-pulse shadow-[0_0_8px_rgba(253,29,29,0.5)]">
-                    REELS HIT ⚡
+                  <span className="shrink-0 px-2 py-0.5 text-[8px] font-black rounded-md bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white animate-pulse shadow-[0_0_10px_rgba(253,29,29,0.6)] tracking-wider">
+                    REELS ⚡
                   </span>
                 )}
                 {audioSourceMode === "spotify" && (
-                  <span className="shrink-0 px-2 py-0.5 text-[9px] font-black rounded-full bg-[#1DB954] text-white shadow-[0_0_8px_rgba(29,185,84,0.5)]">
-                    SPOTIFY
+                  <span className="shrink-0 px-2 py-0.5 text-[8px] font-black rounded-md bg-[#1DB954] text-white shadow-[0_0_10px_rgba(29,185,84,0.6)] tracking-wider">
+                    STUDIO 🎵
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-400 truncate select-none">{currentTrack.artist}</p>
+              <p className="text-[11px] text-gray-400 font-bold tracking-wide truncate select-none uppercase">{currentTrack.artist}</p>
             </div>
           </div>
 
           {/* Orta: Çalma Kontrolleri & İlerleme */}
-          <div className="w-full md:w-2/4 flex flex-col items-center gap-1.5">
-            {/* Ses Kaynağı Seçici Panel */}
-            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 p-0.5 rounded-full mb-1">
-              <button
-                onClick={() => playTrack(currentTrack, "spotify")}
-                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1 ${
-                  audioSourceMode === "spotify"
-                    ? "bg-[#1DB954] text-white shadow-[0_0_10px_rgba(29,185,84,0.4)]"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-white" /> Spotify
-              </button>
-              
-              <button
-                onClick={() => {
-                  if (currentTrack.customPreviewUrl) {
-                    playTrack(currentTrack, "tiktok");
-                  } else {
-                    handleAutoResolveTikTok({
-                      id: currentTrack.id,
-                      title: currentTrack.title,
-                      artist: currentTrack.artist,
-                      type: activeTab === "discover" ? "discover" : activeTab === "favorites" ? "favorite" : "collection",
-                      albumArt: currentTrack.albumArt,
-                      previewUrl: currentTrack.previewUrl
-                    });
-                  }
-                }}
-                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1 ${
-                  audioSourceMode === "tiktok"
-                    ? "bg-[#ff0050] text-white shadow-[0_0_10px_rgba(255,0,80,0.4)]"
-                    : currentTrack.customPreviewUrl
-                      ? "text-[#ff0050]/80 hover:text-white hover:bg-[#ff0050]/10"
-                      : "text-gray-500 hover:text-gray-300"
-                }`}
-                title={currentTrack.customPreviewUrl ? "TikTok Viralini Çal" : "TikTok Viralini Otomatik Çöz ve Çal"}
-              >
-                <TikTokIcon className="h-3 w-3 shrink-0" />
-                {currentTrack.customPreviewUrl ? "TikTok Hit" : "Çöz (TikTok)"}
-              </button>
+          <div className="w-full md:w-2/4 flex flex-col items-center gap-2">
+            {/* Üst Sıra: Ses Kaynak Seçici Panel & Play/Pause */}
+            <div className="flex items-center justify-between w-full max-w-md gap-4">
+              {/* Sol Taraf: Ses Kaynağı Seçici Panel */}
+              <div className="flex items-center gap-1 bg-white/5 border border-white/5 p-0.5 rounded-xl">
+                <button
+                  onClick={() => playTrack(currentTrack, "spotify")}
+                  className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                    audioSourceMode === "spotify"
+                      ? "bg-[#1DB954] text-white shadow-[0_2px_8px_rgba(29,185,84,0.3)] scale-[1.02]"
+                      : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-white shrink-0" /> Spotify
+                </button>
+                
+                <button
+                  onClick={() => {
+                    if (currentTrack.customPreviewUrl) {
+                      playTrack(currentTrack, "tiktok");
+                    } else {
+                      handleAutoResolveTikTok({
+                        id: currentTrack.id,
+                        title: currentTrack.title,
+                        artist: currentTrack.artist,
+                        type: activeTab === "discover" ? "discover" : activeTab === "favorites" ? "favorite" : "collection",
+                        albumArt: currentTrack.albumArt,
+                        previewUrl: currentTrack.previewUrl
+                      });
+                    }
+                  }}
+                  className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                    audioSourceMode === "tiktok"
+                      ? "bg-[#ff0050] text-white shadow-[0_2px_8px_rgba(255,0,80,0.3)] scale-[1.02]"
+                      : currentTrack.customPreviewUrl
+                        ? "text-[#ff0050]/80 hover:text-white hover:bg-[#ff0050]/10"
+                        : "text-gray-500 hover:text-gray-300"
+                  }`}
+                  title={currentTrack.customPreviewUrl ? "TikTok Viralini Çal" : "TikTok Viralini Otomatik Çöz ve Çal"}
+                >
+                  <TikTokIcon className="h-3 w-3 shrink-0" />
+                  {currentTrack.customPreviewUrl ? "TikTok Hit" : "Çöz (TikTok)"}
+                </button>
 
-              <button
-                onClick={() => {
-                  if (currentTrack.instagramAudioUrl) {
-                    playTrack(currentTrack, "instagram");
-                  } else {
-                    handleAutoResolveInstagram({
-                      id: currentTrack.id,
-                      title: currentTrack.title,
-                      artist: currentTrack.artist,
-                      type: activeTab === "discover" ? "discover" : activeTab === "favorites" ? "favorite" : "collection",
-                      albumArt: currentTrack.albumArt,
-                      previewUrl: currentTrack.previewUrl
-                    });
-                  }
-                }}
-                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1 ${
-                  audioSourceMode === "instagram"
-                    ? "bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white shadow-[0_0_10px_rgba(253,29,29,0.4)]"
-                    : currentTrack.instagramAudioUrl
-                      ? "text-[#fd1d1d]/80 hover:text-white hover:bg-[#833ab4]/10"
-                      : "text-gray-500 hover:text-gray-300"
-                }`}
-                title={currentTrack.instagramAudioUrl ? "Instagram Reels Sesini Çal" : "Instagram Reels Sesini Otomatik Çöz ve Çal"}
-              >
-                <InstagramIcon className="h-3 w-3 shrink-0" />
-                {currentTrack.instagramAudioUrl ? "Reels Hit" : "Çöz (Reels)"}
-              </button>
-            </div>
+                <button
+                  onClick={() => {
+                    if (currentTrack.instagramAudioUrl) {
+                      playTrack(currentTrack, "instagram");
+                    } else {
+                      handleAutoResolveInstagram({
+                        id: currentTrack.id,
+                        title: currentTrack.title,
+                        artist: currentTrack.artist,
+                        type: activeTab === "discover" ? "discover" : activeTab === "favorites" ? "favorite" : "collection",
+                        albumArt: currentTrack.albumArt,
+                        previewUrl: currentTrack.previewUrl
+                      });
+                    }
+                  }}
+                  className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                    audioSourceMode === "instagram"
+                      ? "bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white shadow-[0_2px_8px_rgba(253,29,29,0.3)] scale-[1.02]"
+                      : currentTrack.instagramAudioUrl
+                        ? "text-[#fd1d1d]/80 hover:text-white hover:bg-[#833ab4]/10"
+                        : "text-gray-500 hover:text-gray-300"
+                  }`}
+                  title={currentTrack.instagramAudioUrl ? "Instagram Reels Sesini Çal" : "Instagram Reels Sesini Otomatik Çöz ve Çal"}
+                >
+                  <InstagramIcon className="h-3 w-3 shrink-0" />
+                  {currentTrack.instagramAudioUrl ? "Reels Hit" : "Çöz (Reels)"}
+                </button>
+              </div>
 
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => playTrack(currentTrack)}
-                className="h-11 w-11 bg-primary text-white rounded-full flex items-center justify-center active:scale-95 transition-all animate-pulse-glow"
-              >
-                {isPlaying ? <Pause className="h-5 w-5 fill-white" /> : <Play className="h-5 w-5 fill-white translate-x-[1px]" />}
-              </button>
+              {/* Hepsi Bir Arada Çalma ve Ritim Dalgaları */}
+              <div className="flex items-center gap-3 shrink-0">
+                {/* Dans Eden Dalga Animasyonu */}
+                {isPlaying && (
+                  <div className="hidden sm:flex items-center gap-[3px] h-5 px-2 bg-white/5 border border-white/5 rounded-lg shrink-0">
+                    <span className="w-[2px] bg-primary rounded-full animate-music-bar" style={{ animationDelay: "0.1s", height: "40%" }} />
+                    <span className="w-[2px] bg-cyan-glow rounded-full animate-music-bar" style={{ animationDelay: "0.5s", height: "80%" }} />
+                    <span className="w-[2px] bg-spotify rounded-full animate-music-bar" style={{ animationDelay: "0.2s", height: "30%" }} />
+                    <span className="w-[2px] bg-tiktok rounded-full animate-music-bar" style={{ animationDelay: "0.7s", height: "90%" }} />
+                    <span className="w-[2px] bg-purple-500 rounded-full animate-music-bar" style={{ animationDelay: "0.4s", height: "50%" }} />
+                  </div>
+                )}
 
-              {/* Dans Eden Dalga Animasyonu */}
-              {isPlaying && (
-                <div className="hidden lg:flex items-center gap-[4px] h-6 px-3 bg-white/5 border border-white/10 rounded-full shrink-0">
-                  <span className="w-[3px] bg-primary rounded-full animate-music-bar" style={{ animationDelay: "0.1s", height: "40%" }} />
-                  <span className="w-[3px] bg-cyan-glow rounded-full animate-music-bar" style={{ animationDelay: "0.5s", height: "80%" }} />
-                  <span className="w-[3px] bg-spotify rounded-full animate-music-bar" style={{ animationDelay: "0.2s", height: "30%" }} />
-                  <span className="w-[3px] bg-tiktok rounded-full animate-music-bar" style={{ animationDelay: "0.7s", height: "90%" }} />
-                  <span className="w-[3px] bg-purple-500 rounded-full animate-music-bar" style={{ animationDelay: "0.4s", height: "50%" }} />
-                </div>
-              )}
+                <button
+                  onClick={() => playTrack(currentTrack)}
+                  className="h-10 w-10 bg-gradient-to-tr from-[#ff0050] via-[#a855f7] to-[#00f2fe] text-white rounded-xl flex items-center justify-center active:scale-95 hover:scale-105 transition-all shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:shadow-[0_0_25px_rgba(168,85,247,0.5)] cursor-pointer"
+                >
+                  {isPlaying ? <Pause className="h-4.5 w-4.5 fill-white" /> : <Play className="h-4.5 w-4.5 fill-white translate-x-[1px]" />}
+                </button>
+              </div>
             </div>
 
             {/* İlerleme Çubuğu */}
-            <div className="w-full flex items-center gap-3">
-              <span className="text-[10px] text-gray-400 font-mono select-none">
+            <div className="w-full flex items-center gap-2.5 px-2">
+              <span className="text-[9px] text-gray-400 font-black tracking-widest select-none">
                 {formatTime(currentTime)}
               </span>
               <div
                 ref={progressRef}
                 onClick={handleProgressBarClick}
-                className="flex-1 h-1.5 bg-white/10 rounded-full relative cursor-pointer group"
+                className="flex-1 h-1 bg-white/10 hover:h-1.5 rounded-full relative cursor-pointer group transition-all"
               >
                 {/* Glow Efektli İlerleme Çizgisi */}
                 <div
-                  className="h-full bg-gradient-to-r from-primary to-cyan-glow rounded-full relative transition-all duration-75 shadow-[0_0_8px_rgba(168,85,247,0.8)]"
+                  className="h-full bg-gradient-to-r from-[#ff0050] via-[#a855f7] to-[#00f2fe] rounded-full relative transition-all duration-75 shadow-[0_0_10px_rgba(168,85,247,0.6)]"
                   style={{ width: `${(currentTime / duration) * 100}%` }}
                 />
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity border border-primary pointer-events-none"
-                  style={{ left: `calc(${(currentTime / duration) * 100}% - 7px)` }}
+                  className="absolute top-1/2 -translate-y-1/2 h-3 w-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity border border-primary pointer-events-none shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                  style={{ left: `calc(${(currentTime / duration) * 100}% - 6px)` }}
                 />
               </div>
-              <span className="text-[10px] text-gray-400 font-mono select-none">
+              <span className="text-[9px] text-gray-400 font-black tracking-widest select-none">
                 {formatTime(duration)}
               </span>
             </div>
@@ -2027,23 +2458,23 @@ export default function Dashboard({ initialSession }: DashboardProps) {
 
           {/* Sağ: Ses Seviyesi & Tiktok Redirect */}
           <div className="w-full md:w-1/4 flex items-center justify-end gap-4 shrink-0">
-            {/* TikTok Redirect Button (Neon Hot Pink!) */}
+            {/* TikTok Redirect Button */}
             <a
               href={currentTrack.tiktokUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-black bg-[#ff0050] text-white hover:bg-[#e00045] rounded-full active:scale-95 shadow-[0_0_15px_rgba(255,0,80,0.4)] hover:shadow-[0_0_25px_rgba(255,0,80,0.8)] transition-all uppercase tracking-wider shrink-0"
+              className="inline-flex items-center gap-1.5 px-4.5 py-2 text-[10px] font-black bg-gradient-to-r from-[#ff0050] to-[#e00045] text-white hover:scale-105 active:scale-95 shadow-[0_4px_12px_rgba(255,0,80,0.3)] hover:shadow-[0_0_20px_rgba(255,0,80,0.6)] transition-all uppercase tracking-wider shrink-0 cursor-pointer rounded-xl"
             >
-              TikTok'ta Ara <ExternalLink className="h-3 w-3" />
+              TikTok'ta Gör <ExternalLink className="h-3 w-3 shrink-0" />
             </a>
 
             {/* Ses Seviyesi */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
               <button
                 onClick={() => setIsMuted(!isMuted)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 hover:text-white transition-colors cursor-pointer"
               >
-                {isMuted || volume === 0 ? <VolumeX className="h-4.5 w-4.5 text-red-500" /> : <Volume2 className="h-4.5 w-4.5" />}
+                {isMuted || volume === 0 ? <VolumeX className="h-4 w-4 text-red-500" /> : <Volume2 className="h-4 w-4" />}
               </button>
               <input
                 type="range"

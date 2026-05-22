@@ -97,6 +97,7 @@ export async function autoResolveTikTokAudio(title: string, artist: string): Pro
       const musicTitle = (video.music_info?.title || "").toLowerCase();
       const musicAuthor = (video.music_info?.author || "").toLowerCase();
       const authorName = (video.author?.nickname || "").toLowerCase();
+      const duration = video.duration || 0;
 
       // 1. Kara Liste Cezaları (Konser, remix, sped-up vb. filtreleme)
       for (const word of blacklist) {
@@ -104,7 +105,18 @@ export async function autoResolveTikTokAudio(title: string, artist: string): Pro
         if (musicTitle.includes(word)) score -= 180;
       }
 
-      // 2. Doğru Sanatçı ve Şarkı Adı Ödülleri
+      // 2. Süre Cezalandırma ve Ödüllendirme (Kısa editlemeleri engelleme)
+      if (duration > 0) {
+        if (duration < 12) {
+          score -= 300; // Çok kısa kalitesiz kliplere ağır ceza
+        } else if (duration < 15) {
+          score -= 120; // 12-15s arası kısa kesit cezası
+        } else if (duration >= 20 && duration <= 60) {
+          score += 40;  // 20-60s ideal viral ses ödülü
+        }
+      }
+
+      // 3. Doğru Sanatçı ve Şarkı Adı Ödülleri
       const lowerArtist = artist.toLowerCase();
       const lowerTitle = title.toLowerCase();
 
@@ -120,7 +132,7 @@ export async function autoResolveTikTokAudio(title: string, artist: string): Pro
         score += 60;
       }
 
-      // 3. Orijinal/Stüdyo Versiyon Teşvikleri
+      // 4. Orijinal/Stüdyo Versiyon Teşvikleri
       for (const keyword of originalKeywords) {
         if (musicTitle.includes(keyword) || videoTitle.includes(keyword)) {
           score += 60;
@@ -130,7 +142,7 @@ export async function autoResolveTikTokAudio(title: string, artist: string): Pro
         score += 20;
       }
 
-      console.log(`[TikTok Puanlama] Başlık: "${videoTitle.substring(0, 45)}" | Müzik: "${musicTitle.substring(0, 45)}" | Yazar: "${musicAuthor.substring(0, 25)}" | Skor: ${score}`);
+      console.log(`[TikTok Puanlama] Başlık: "${videoTitle.substring(0, 35)}" | Müzik: "${musicTitle.substring(0, 35)}" | Süre: ${duration}s | Skor: ${score}`);
 
       // Müzik çalma linki kontrolü
       const playUrl = video.music || video.music_info?.play;
@@ -247,6 +259,7 @@ function selectBestReelsVideo(videos: any[], title: string, artist: string): { p
     const videoTitle = (video.title || "").toLowerCase();
     const musicTitle = (video.music_info?.title || "").toLowerCase();
     const musicAuthor = (video.music_info?.author || "").toLowerCase();
+    const duration = video.duration || 0;
 
     // 1. Kara Liste Filtresi (Remix/Edit versiyonlar elensin)
     for (const word of blacklist) {
@@ -254,20 +267,31 @@ function selectBestReelsVideo(videos: any[], title: string, artist: string): { p
       if (musicTitle.includes(word)) score -= 180;
     }
 
-    // 2. Reels & Instagram Kelime Ödülleri
+    // 2. Süre Cezalandırma ve Ödüllendirme (Kısa editlemeleri engelleme)
+    if (duration > 0) {
+      if (duration < 12) {
+        score -= 300; // Çok kısa kalitesiz kliplere ağır ceza
+      } else if (duration < 15) {
+        score -= 120; // 12-15s arası kısa kesit cezası
+      } else if (duration >= 20 && duration <= 60) {
+        score += 40;  // 20-60s ideal Reels viral ses ödülü
+      }
+    }
+
+    // 3. Reels & Instagram Kelime Ödülleri
     for (const word of reelsKeywords) {
       if (videoTitle.includes(word)) score += 40;
       if (musicTitle.includes(word)) score += 30;
     }
 
-    // 3. Orijinal/Stüdyo Versiyon Teşvikleri
+    // 4. Orijinal/Stüdyo Versiyon Teşvikleri
     for (const keyword of originalKeywords) {
       if (musicTitle.includes(keyword) || videoTitle.includes(keyword)) {
         score += 60;
       }
     }
 
-    // 4. Doğru Sanatçı ve Şarkı Ödülleri
+    // 5. Doğru Sanatçı ve Şarkı Ödülleri
     const lowerArtist = artist.toLowerCase();
     const lowerTitle = title.toLowerCase();
 
@@ -283,7 +307,7 @@ function selectBestReelsVideo(videos: any[], title: string, artist: string): { p
       score += 60;
     }
 
-    console.log(`[Reels Puanlama] Başlık: "${videoTitle.substring(0, 45)}" | Müzik: "${musicTitle.substring(0, 45)}" | Yazar: "${musicAuthor.substring(0, 25)}" | Skor: ${score}`);
+    console.log(`[Reels Puanlama] Başlık: "${videoTitle.substring(0, 35)}" | Müzik: "${musicTitle.substring(0, 35)}" | Süre: ${duration}s | Skor: ${score}`);
 
     const playUrl = video.music || video.music_info?.play;
     if (!playUrl) continue;

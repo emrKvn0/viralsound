@@ -13,6 +13,27 @@ export interface SpotifyTrack {
   instagramVideoUrl?: string;
 }
 
+// Deezer Public API üzerinden resmi stüdyo şarkı kesiti (previewUrl) bulma eylemi (%100 orijinal ve temiz sesler için)
+async function fetchDeezerPreviewUrl(artist: string, title: string): Promise<string | null> {
+  try {
+    const cleanArtist = artist.split("feat.")[0].split("&")[0].trim();
+    const cleanTitle = title.split("(")[0].split("-")[0].trim();
+    const query = encodeURIComponent(`${cleanArtist} ${cleanTitle}`);
+    
+    const response = await fetch(
+      `https://api.deezer.com/search?q=${query}&limit=1`,
+      { next: { revalidate: 3600 } } // 1 saat önbelleğe al
+    );
+    
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.data?.[0]?.preview || null;
+  } catch (error) {
+    console.error("Deezer API bağlanamadı:", error);
+    return null;
+  }
+}
+
 // iTunes Search API üzerinden şarkı kesiti (previewUrl) bulma eylemi (Spotify 2024/2026 kısıtlamalarını aşmak için)
 async function fetchiTunesPreviewUrl(artist: string, title: string): Promise<string | null> {
   try {
@@ -110,8 +131,9 @@ export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
           track.album?.images?.[0]?.url ||
           "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop";
 
-        // Spotify'ın NULL dönen preview_url'i yerine iTunes'tan taze 30s kesit buluyoruz!
+        // Spotify'ın NULL dönen preview_url'i yerine Deezer ve iTunes ile resmi stüdyo 30s kesit buluyoruz!
         const previewUrl =
+          (await fetchDeezerPreviewUrl(artist, title)) ||
           (await fetchiTunesPreviewUrl(artist, title)) ||
           track.preview_url ||
           `https://www.soundhelix.com/examples/mp3/SoundHelix-Song-${Math.floor(Math.random() * 6) + 1}.mp3`;
@@ -159,7 +181,10 @@ async function searchiTunesDirect(query: string): Promise<SpotifyTrack[]> {
           item.artworkUrl100?.replace("100x100bb.jpg", "400x400bb.jpg") ||
           "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop";
           
-        const previewUrl = item.previewUrl || "";
+        const previewUrl =
+          (await fetchDeezerPreviewUrl(artist, title)) ||
+          item.previewUrl ||
+          "";
         const tiktokUrl = await getTikTokRedirectUrl(artist, title);
 
         return {
