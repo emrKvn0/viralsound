@@ -89,7 +89,7 @@
 }
 
 body {
-  background: radial-gradient(circle at 50% 0%, #1c0e35 0%, #050409 70%);
+  background-color: #050409;
   color: var(--foreground);
   font-family: var(--font-outfit), Arial, sans-serif;
   min-height: 100vh;
@@ -130,3 +130,60 @@ body {
 .neon-border:hover::after {
   opacity: 0.4;
 }
+
+/* Mobile Performance and Styling Optimizations */
+@media (max-width: 768px) {
+  /* GPU yükünü tamamen sıfırlamak için mobilde backdrop-filter'ı kaldırıyoruz */
+  .glass-panel,
+  .unified-dark-panel,
+  header,
+  nav,
+  .backdrop-blur-xl,
+  .backdrop-blur-2xl {
+    background: rgba(13, 10, 29, 0.98) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  /* Mobil dokunmatik cihazlarda kaydırma FPS'ini düşüren hover efektlerini kapat */
+  .glass-panel-hover:hover,
+  .glass-panel-hover:active {
+    transform: none !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  /* Mobil padding azaltımı */
+  .glass-panel {
+    padding: 0.85rem !important;
+  }
+  
+  /* Ağır scaling ve dönüşüm efektlerini kapat */
+  .group-hover\:scale-105:hover, 
+  .hover\:scale-105:hover,
+  .group-hover\/item\:text-primary:hover {
+    transform: none !important;
+  }
+
+  /* Mobilde yoğun CPU yoran parıltı animasyonunu basitleştir */
+  .animate-pulse-glow,
+  .shadow-\[0_0_15px_rgba\(168\,85\,247\,0\.4\)\] {
+    animation: none !important;
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.2) !important;
+  }
+
+  /* Akıcı ve pürüzsüz kaydırma optimizasyonu */
+  body, html {
+    scroll-behavior: auto !important; /* Dokunmatik kaydırmada ani tepkiler için en iyisi */
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Unified dark section styling helper */
+.unified-dark-panel {
+  background: rgba(13, 10, 29, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+

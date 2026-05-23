@@ -13,6 +13,10 @@ export interface SpotifyTrack {
   instagramVideoUrl?: string;
 }
 
+// Global bellek içi önbellek (In-Memory Cache) mekanizmaları (0ms gecikme için)
+const previewUrlCache = new Map<string, string>();
+const searchCache = new Map<string, SpotifyTrack[]>();
+
 // Deezer Public API üzerinden resmi stüdyo şarkı kesiti (previewUrl) bulma eylemi (%100 orijinal ve temiz sesler için)
 async function fetchDeezerPreviewUrl(artist: string, title: string): Promise<string | null> {
   try {
@@ -63,11 +67,18 @@ export async function getTikTokRedirectUrl(artist: string, title: string): Promi
 
 // Güvenli Arama Motoru (Spotify + iTunes Hybrid)
 export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
+  const cacheKey = (query || "trending_default").trim().toLowerCase();
+  
+  // 1. Arama sorgusu önbellekte varsa ANINDA (0ms) döndür!
+  if (searchCache.has(cacheKey)) {
+    console.log(`[Cache Hit] Arama Önbellekten Getirildi: ${cacheKey}`);
+    return searchCache.get(cacheKey)!;
+  }
+
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
 
   // Spotify anahtarları girilmemişse veya boş ise DOĞRUDAN iTunes Search API'yi kullan!
-  // Bu sayede kullanıcı Spotify Developer hesabı açmadan dahi %100 GERÇEK şarkıları ve sesleri aratabilir!
   const isMockEnv =
     !clientId ||
     !clientSecret ||
@@ -76,14 +87,13 @@ export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
 
   if (isMockEnv) {
     if (!query) {
-      // Varsayılan trend şarkılar için iTunes'tan popüler parçaları çek
       return searchiTunesDirect("trending");
     }
     return searchiTunesDirect(query);
   }
 
   try {
-    // 1. Spotify Access Token Al
+    // Spotify Access Token Al
     const authString = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
     const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
@@ -103,10 +113,10 @@ export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
 
-    // 2. Spotify Arama Yap
+    // Spotify Arama Yap
     const searchUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(
       query || "year:2025-2026"
-    )}&type=track&limit=15`;
+    )}&type=track&limit=30`;
     
     const searchResponse = await fetch(searchUrl, {
       headers: {
@@ -122,7 +132,7 @@ export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
     const searchData = await searchResponse.json();
     const tracks = searchData.tracks?.items || [];
 
-    // 3. Spotify sonuçları için arka planda iTunes önizleme URL'lerini eşleştir
+    // Spotify sonuçları için arka planda iTunes önizleme URL'lerini eşleştir
     const formattedTracks: SpotifyTrack[] = await Promise.all(
       tracks.map(async (track: any) => {
         const title = track.name;
@@ -131,12 +141,21 @@ export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
           track.album?.images?.[0]?.url ||
           "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop";
 
-        // Spotify'ın NULL dönen preview_url'i yerine Deezer ve iTunes ile resmi stüdyo 30s kesit buluyoruz!
-        const previewUrl =
-          (await fetchDeezerPreviewUrl(artist, title)) ||
-          (await fetchiTunesPreviewUrl(artist, title)) ||
-          track.preview_url ||
-          `https://www.soundhelix.com/examples/mp3/SoundHelix-Song-${Math.floor(Math.random() * 6) + 1}.mp3`;
+        // Spotify'ın kendi preview_url'i varsa doğrudan kullan, Deezer/iTunes isteklerini tamamen atla!
+        let previewUrl = track.preview_url;
+        
+        if (!previewUrl) {
+          const trackCacheKey = `${artist}-${title}`.toLowerCase();
+          if (previewUrlCache.has(trackCacheKey)) {
+            previewUrl = previewUrlCache.get(trackCacheKey)!;
+          } else {
+            previewUrl =
+              (await fetchDeezerPreviewUrl(artist, title)) ||
+              (await fetchiTunesPreviewUrl(artist, title)) ||
+              `https://www.soundhelix.com/examples/mp3/SoundHelix-Song-${Math.floor(Math.random() * 6) + 1}.mp3`;
+            previewUrlCache.set(trackCacheKey, previewUrl);
+          }
+        }
 
         const tiktokUrl = await getTikTokRedirectUrl(artist, title);
 
@@ -151,6 +170,8 @@ export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
       })
     );
 
+    // Sonuçları önbelleğe kaydet
+    searchCache.set(cacheKey, formattedTracks);
     return formattedTracks;
   } catch (error) {
     console.error("Spotify API arama hatası, iTunes'a geçiliyor:", error);
@@ -160,10 +181,16 @@ export async function searchTracks(query: string): Promise<SpotifyTrack[]> {
 
 // Doğrudan iTunes Search API Arama Yardımcısı
 async function searchiTunesDirect(query: string): Promise<SpotifyTrack[]> {
+  const cacheKey = `itunes_${(query || "trending_default").trim().toLowerCase()}`;
+  
+  if (searchCache.has(cacheKey)) {
+    return searchCache.get(cacheKey)!;
+  }
+
   try {
     const searchTerm = query === "trending" ? "hits 2026" : query;
     const response = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&media=music&limit=15`
+      `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&media=music&limit=30`
     );
 
     if (!response.ok) return [];
@@ -176,15 +203,23 @@ async function searchiTunesDirect(query: string): Promise<SpotifyTrack[]> {
         const title = item.trackName || "Bilinmeyen Şarkı";
         const artist = item.artistName || "Bilinmeyen Sanatçı";
         
-        // 100x100 kapak resmini premium görünüm için 400x400 boyutuna yükseltiyoruz
+        // Artwork yükseltme
         const albumArt =
           item.artworkUrl100?.replace("100x100bb.jpg", "400x400bb.jpg") ||
           "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop";
           
-        const previewUrl =
-          (await fetchDeezerPreviewUrl(artist, title)) ||
-          item.previewUrl ||
-          "";
+        let previewUrl = item.previewUrl;
+        if (!previewUrl) {
+          const trackCacheKey = `${artist}-${title}`.toLowerCase();
+          if (previewUrlCache.has(trackCacheKey)) {
+            previewUrl = previewUrlCache.get(trackCacheKey)!;
+          } else {
+            previewUrl =
+              (await fetchDeezerPreviewUrl(artist, title)) ||
+              "";
+            previewUrlCache.set(trackCacheKey, previewUrl);
+          }
+        }
         const tiktokUrl = await getTikTokRedirectUrl(artist, title);
 
         return {
@@ -198,9 +233,24 @@ async function searchiTunesDirect(query: string): Promise<SpotifyTrack[]> {
       })
     );
 
+    searchCache.set(cacheKey, formatted);
     return formatted;
   } catch (error) {
     console.error("iTunes doğrudan arama hatası:", error);
+    return [];
+  }
+}
+
+// Çoklu Şarkı Sorgularını Sunucu Tarafında Tek Seferde Paralel Çözme (Bulk/Batch Search)
+export async function searchTracksBulk(queries: string[]): Promise<SpotifyTrack[]> {
+  try {
+    const promises = queries.map(query => 
+      searchTracks(query).then(res => res[0] || null)
+    );
+    const results = await Promise.all(promises);
+    return results.filter((t): t is SpotifyTrack => t !== null);
+  } catch (error) {
+    console.error("Toplu arama hatası:", error);
     return [];
   }
 }

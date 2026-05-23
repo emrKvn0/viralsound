@@ -1,0 +1,68 @@
+export interface TrendingHit {
+  title: string;
+  artist: string;
+  language: string;
+  genre: string;
+}
+
+export const TRENDING_HITS: TrendingHit[] = [
+  { title: "After Party", artist: "Don Toliver", language: "global", genre: "rap" },
+  { title: "FE!N", artist: "Travis Scott", language: "global", genre: "rap" },
+  { title: "Blinding Lights", artist: "The Weeknd", language: "global", genre: "pop" },
+  { title: "L'AMOUR DE MA VIE", artist: "Billie Eilish", language: "global", genre: "pop" },
+  { title: "MILLION DOLLAR BABY", artist: "Tommy Richman", language: "global", genre: "r&b" },
+  { title: "Beautiful Things", artist: "Benson Boone", language: "global", genre: "pop" },
+  { title: "I Like The Way You Kiss Me", artist: "Artemas", language: "global", genre: "dance" },
+  { title: "Espresso", artist: "Sabrina Carpenter", language: "global", genre: "pop" },
+  { title: "Good Luck, Babe!", artist: "Chappell Roan", language: "global", genre: "pop" },
+  { title: "Not Like Us", artist: "Kendrick Lamar", language: "global", genre: "rap" },
+  { title: "One Dance", artist: "Drake", language: "global", genre: "pop" },
+  { title: "BAND4BAND", artist: "Central Cee", language: "global", genre: "rap" },
+  { title: "BIRDS OF A FEATHER", artist: "Billie Eilish", language: "global", genre: "pop" },
+  { title: "Starboy", artist: "The Weeknd", language: "global", genre: "pop" },
+  { title: "Bandit", artist: "Don Toliver", language: "global", genre: "rap" },
+  { title: "Goosebumps", artist: "Travis Scott", language: "global", genre: "rap" },
+  { title: "Like That", artist: "Future", language: "global", genre: "rap" },
+  { title: "Too Sweet", artist: "Hozier", language: "global", genre: "rock" },
+  { title: "End of Beginning", artist: "Djo", language: "global", genre: "pop" },
+  { title: "Lose Control", artist: "Teddy Swims", language: "global", genre: "r&b" },
+  { title: "Lovin On Me", artist: "Jack Harlow", language: "global", genre: "rap" },
+  { title: "Paint The Town Red", artist: "Doja Cat", language: "global", genre: "rap" },
+  { title: "Houdini", artist: "Eminem", language: "global", genre: "rap" },
+  { title: "fukumean", artist: "Gunna", language: "global", genre: "rap" },
+  { title: "I'm Good (Blue)", artist: "David Guetta", language: "global", genre: "dance" },
+  { title: "Calm Down", artist: "Rema", language: "global", genre: "pop" },
+  { title: "Flowers", artist: "Miley Cyrus", language: "global", genre: "pop" },
+  { title: "Stargirl Interlude", artist: "The Weeknd", language: "global", genre: "r&b" },
+  { title: "Popular", artist: "The Weeknd", language: "global", genre: "pop" },
+  { title: "Cruel Summer", artist: "Taylor Swift", language: "global", genre: "pop" },
+  { title: "Greedy", artist: "Tate McRae", language: "global", genre: "pop" },
+  { title: "Gata Only", artist: "FloyyMenor", language: "global", genre: "rap" },
+  { title: "Sweater Weather", artist: "The Neighbourhood", language: "global", genre: "rock" },
+  { title: "Do I Wanna Know?", artist: "Arctic Monkeys", language: "global", genre: "rock" },
+  { title: "Another Love", artist: "Tom Odell", language: "global", genre: "rock" },
+  
+  // Türkçe Popüler Şarkılar (Türkçe Rap / Pop / Rock)
+  { title: "Pişman Değilim", artist: "Semicenk", language: "tr", genre: "pop" },
+  { title: "DOĞUŞTAN BERİ", artist: "Lvbel C5", language: "tr", genre: "rap" },
+  { title: "LAFLA PEYNİR GEMİSİ", artist: "Blok3", language: "tr", genre: "rap" },
+  { title: "Fırtınadayım", artist: "Mabel Matiz", language: "tr", genre: "pop" },
+  { title: "Aşkın Olayım", artist: "Simge", language: "tr", genre: "pop" },
+  { title: "Belki", artist: "Dedublüman", language: "tr", genre: "rock" },
+  { title: "ARASAN DA", artist: "UZI", language: "tr", genre: "rap" },
+  { title: "Mesafe", artist: "Semicenk", language: "tr", genre: "pop" },
+  { title: "SUBMARINA", artist: "Lvbel C5", language: "tr", genre: "rap" },
+  { title: "AFFETMEM", artist: "Blok3", language: "tr", genre: "rap" },
+  { title: "Sen Dönene Kadar", artist: "Hadise", language: "tr", genre: "pop" },
+  { title: "Pusulam Rüzgar", artist: "Melike Şahin", language: "tr", genre: "pop" },
+  { title: "Lan", artist: "Zeynep Bastık", language: "tr", genre: "pop" },
+  { title: "Ateşe Düştüm", artist: "Mert Demir", language: "tr", genre: "pop" },
+  { title: "Ali Cabbar", artist: "Emir Can İğrek", language: "tr", genre: "pop" },
+  { title: "Cevapsız Sorular", artist: "maNga", language: "tr", genre: "rock" },
+  { title: "Seni Dert Etmeler", artist: "Madrigal", language: "tr", genre: "rock" },
+  { title: "Dip", artist: "Madrigal", language: "tr", genre: "rock" },
+  { title: "Bir Derdim Var", artist: "Mor ve Ötesi", language: "tr", genre: "rock" },
+  { title: "Cambaz", artist: "Mor ve Ötesi", language: "tr", genre: "rock" },
+  { title: "100 Numara", artist: "Lvbel C5", language: "tr", genre: "rap" },
+  { title: "Fark Etmez", artist: "Blok3", language: "tr", genre: "rap" }
+];

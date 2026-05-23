@@ -23,7 +23,15 @@ export default function RootLayout({
       lang="tr"
       className={`${outfit.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans relative">
+        {/* Yüksek Performanslı Sabit Arka Plan Katmanı */}
+        <div className="fixed inset-0 -z-10 pointer-events-none w-full h-full bg-[#050409]" style={{
+          background: "radial-gradient(circle at 50% 0%, #1c0e35 0%, #050409 100%)",
+          willChange: "transform",
+          transform: "translate3d(0, 0, 0)"
+        }} />
+        {children}
+      </body>
     </html>
   );
 }
