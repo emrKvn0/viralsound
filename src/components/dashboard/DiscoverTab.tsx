@@ -35,6 +35,7 @@ interface DiscoverTabProps {
   recentSearches: string[];
   setRecentSearches: React.Dispatch<React.SetStateAction<string[]>>;
   tracks: SpotifyTrack[];
+  searchResults: SpotifyTrack[];
   favorites: DBFavorite[];
   resolvedCache: Record<string, any>;
   currentTrack: SpotifyTrack | null;
@@ -63,6 +64,7 @@ export default function DiscoverTab({
   recentSearches,
   setRecentSearches,
   tracks,
+  searchResults,
   favorites,
   resolvedCache,
   currentTrack,
@@ -82,6 +84,36 @@ export default function DiscoverTab({
   // Yerel Yönetim State'leri
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"popular" | "az" | "artist">("popular");
+
+  // Arama için yerel input ve dropdown durumu
+  const [inputValue, setInputValue] = useState(searchQuery);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Arama inputu değiştikçe 300ms debounce ile aramayı otomatik tetikle (Gerçek zamanlı öneri)
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(inputValue);
+      if (inputValue.trim()) {
+        setIsDropdownOpen(true);
+      } else {
+        setIsDropdownOpen(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [inputValue, setSearchQuery]);
+
+  const handleSearchSubmit = () => {
+    setSearchQuery(inputValue);
+    if (inputValue.trim()) {
+      setIsDropdownOpen(true);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setInputValue("");
+    setSearchQuery("");
+    setIsDropdownOpen(false);
+  };
 
   // Trend Hits listesinden şarkıya ait dil/tür etiketini bulma
   const getTrackBadge = (title: string, artist: string) => {
@@ -132,9 +164,12 @@ export default function DiscoverTab({
   return (
     <div className="flex flex-col gap-6">
       {/* Kahraman Alanı (Hero Section) */}
-      <div className="relative glass-panel rounded-3xl p-8 lg:p-12 overflow-hidden border border-white/10 flex flex-col items-center text-center lg:text-left lg:items-start lg:justify-between gap-6">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-primary/20 via-cyan-glow/10 to-transparent rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-spotify/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative glass-panel rounded-3xl p-8 lg:p-12 border border-white/10 flex flex-col items-center text-center lg:text-left lg:items-start lg:justify-between gap-6">
+        {/* Glow'ların dışarı taşmasını önlemek için ayrı bir maskleyici div */}
+        <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none z-0">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-primary/20 via-cyan-glow/10 to-transparent rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-spotify/15 rounded-full blur-3xl" />
+        </div>
 
         <div className="max-w-2xl relative z-10 flex flex-col gap-3">
           <span className="self-center lg:self-start text-xs font-extrabold tracking-widest text-primary uppercase bg-primary/10 px-3 py-1 rounded-full border border-primary/20 animate-[fadeIn_0.4s_ease-out] flex items-center gap-1.5 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
@@ -149,15 +184,39 @@ export default function DiscoverTab({
           </p>
         </div>
 
-        {/* Canlı Arama Kutusu */}
-        <div className="w-full max-w-xl relative z-10 flex flex-col gap-2.5">
-          <Input
-            type="text"
-            placeholder="Sanatçı, şarkı adı veya müzik türü arayın..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            icon={loading ? <Loader2 className="h-5 w-5 text-primary animate-spin" /> : <Search className="h-5 w-5" />}
-          />
+        {/* Canlı Arama Kutusu & Dropdown Menüsü */}
+        <div className="w-full max-w-xl relative z-20 flex flex-col gap-2.5">
+          <div className="relative w-full flex items-center gap-2">
+            <div className="relative flex-1 flex items-center">
+              <Input
+                type="text"
+                placeholder="Sanatçı, şarkı veya müzik türü yazıp Enter'a basın..."
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleSearchSubmit();
+                  }
+                }}
+                icon={loading ? <Loader2 className="h-5 w-5 text-primary animate-spin" /> : <Search className="h-5 w-5" />}
+              />
+              {inputValue && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-4 text-gray-400 hover:text-white transition-colors cursor-pointer p-1"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Button
+              variant="primary"
+              onClick={handleSearchSubmit}
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:scale-[1.02] active:scale-95 transition-all text-xs font-black uppercase tracking-wider cursor-pointer shadow-[0_4px_15px_rgba(168,85,247,0.3)] shrink-0 h-[46px]"
+            >
+              Ara
+            </Button>
+          </div>
 
           {/* Son Aramalar */}
           {recentSearches.length > 0 && (
@@ -166,7 +225,11 @@ export default function DiscoverTab({
               {recentSearches.map((q, idx) => (
                 <div key={idx} className="flex items-center gap-1.5 bg-white/5 border border-white/10 hover:border-primary/40 rounded-full px-3 py-1 transition-all">
                   <button
-                    onClick={() => setSearchQuery(q)}
+                    onClick={() => {
+                      setInputValue(q);
+                      setSearchQuery(q);
+                      setIsDropdownOpen(true);
+                    }}
                     className="text-[10px] text-gray-300 hover:text-white font-bold cursor-pointer"
                   >
                     {q}
@@ -186,6 +249,187 @@ export default function DiscoverTab({
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Şarkı Arama Dropdown Önerilenler Paneli */}
+          {isDropdownOpen && searchQuery.trim() !== "" && (
+            <div className="absolute top-[52px] left-0 right-0 z-50 bg-[#0c0a1a]/98 border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] max-h-[380px] overflow-y-auto p-3 flex flex-col gap-2 scrollbar-thin animate-[fade-in_0.2s_ease-out]">
+              <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-1 px-1">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  ÖNERİLEN ARAMA SONUÇLARI ({searchResults.length})
+                </span>
+                <button 
+                  onClick={() => setIsDropdownOpen(false)}
+                  className="text-gray-400 hover:text-white cursor-pointer p-0.5 rounded hover:bg-white/5 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
+                  <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Şarkılar aranıyor...</span>
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="text-center py-8 text-xs text-gray-500 font-semibold italic">
+                  Eşleşen şarkı bulunamadı. Lütfen başka bir arama yapın.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {searchResults.map((track) => {
+                    const favRecord = favorites.find(f => f.spotifyId === track.id);
+                    const hasCustomTikTok = !!favRecord?.customPreviewUrl || !!resolvedCache[track.id]?.customPreviewUrl;
+                    const hasCustomInstagram = !!favRecord?.instagramAudioUrl || !!resolvedCache[track.id]?.instagramAudioUrl;
+                    
+                    const playbackTrack = { 
+                      ...track, 
+                      customPreviewUrl: favRecord?.customPreviewUrl || resolvedCache[track.id]?.customPreviewUrl || undefined, 
+                      tiktokVideoUrl: favRecord?.tiktokVideoUrl || resolvedCache[track.id]?.tiktokVideoUrl || undefined,
+                      instagramAudioUrl: favRecord?.instagramAudioUrl || resolvedCache[track.id]?.instagramAudioUrl || undefined,
+                      instagramVideoUrl: favRecord?.instagramVideoUrl || resolvedCache[track.id]?.instagramVideoUrl || undefined
+                    };
+
+                    const active = currentTrack?.id === track.id;
+                    const playing = active && isPlaying;
+
+                    return (
+                      <div 
+                        key={track.id} 
+                        className={`flex items-center justify-between gap-3 p-2 rounded-xl border transition-[background-color,border-color,box-shadow] duration-200 ${
+                          active 
+                            ? "bg-white/10 border-primary/40 shadow-[0_0_12px_rgba(168,85,247,0.1)]" 
+                            : "bg-white/3 border-white/5 hover:border-white/10 hover:bg-white/5"
+                        }`}
+                      >
+                        <div 
+                          onClick={() => playTrack(playbackTrack)}
+                          className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                        >
+                          <div className="relative h-10 w-10 rounded-lg overflow-hidden shrink-0 border border-white/5 bg-black/20">
+                            <img
+                              src={track.albumArt}
+                              alt={track.title}
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                              {playing ? <Pause className="h-4.5 w-4.5 text-white fill-white" /> : <Play className="h-4.5 w-4.5 text-white fill-white translate-x-[0.5px]" />}
+                            </div>
+                            {playing && (
+                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-[2px]">
+                                <span className="w-[2px] h-3 bg-primary rounded-full animate-music-bar" style={{ animationDelay: "0.1s" }} />
+                                <span className="w-[2px] h-3 bg-cyan-glow rounded-full animate-music-bar" style={{ animationDelay: "0.3s" }} />
+                                <span className="w-[2px] h-3 bg-spotify rounded-full animate-music-bar" style={{ animationDelay: "0.5s" }} />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h5 className="font-extrabold text-white text-xs truncate leading-tight group-hover:text-primary transition-colors font-sans">
+                              {track.title}
+                            </h5>
+                            <p className="text-[10px] text-gray-400 truncate mt-0.5">{track.artist}</p>
+                          </div>
+                        </div>
+
+                        {/* Dropdown Aksiyon Butonları */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {/* TikTok */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              handleAutoResolveTikTok({
+                                id: track.id,
+                                title: track.title,
+                                artist: track.artist,
+                                type: "discover",
+                                albumArt: track.albumArt,
+                                previewUrl: track.previewUrl
+                              });
+                            }}
+                            disabled={resolvingTrackId === track.id}
+                            className={`h-7 w-7 rounded-lg transition-colors duration-200 border flex items-center justify-center cursor-pointer ${
+                              resolvingTrackId === track.id
+                                ? "bg-white/5 border-white/10 text-gray-500"
+                                : hasCustomTikTok 
+                                  ? "bg-[#ff0050]/15 border-[#ff0050]/30 text-[#ff0050]" 
+                                  : "bg-white/3 border-white/5 text-gray-400 hover:text-white hover:border-[#ff0050]/30"
+                            }`}
+                            title="TikTok Sesini Çöz"
+                          >
+                            {resolvingTrackId === track.id ? (
+                              <Loader2 className="h-3.5 w-3.5 text-[#ff0050] animate-spin" />
+                            ) : (
+                              <TikTokIcon className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+
+                          {/* Instagram */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              handleAutoResolveInstagram({
+                                id: track.id,
+                                title: track.title,
+                                artist: track.artist,
+                                type: "discover",
+                                albumArt: track.albumArt,
+                                previewUrl: track.previewUrl
+                              });
+                            }}
+                            disabled={resolvingInstagramTrackId === track.id}
+                            className={`h-7 w-7 rounded-lg transition-colors duration-200 border flex items-center justify-center cursor-pointer ${
+                              resolvingInstagramTrackId === track.id
+                                ? "bg-white/5 border-white/10 text-gray-500"
+                                : hasCustomInstagram 
+                                  ? "bg-[#833ab4]/15 border-[#833ab4]/30 text-[#fd1d1d]" 
+                                  : "bg-white/3 border-white/5 text-gray-400 hover:text-white hover:border-[#833ab4]/30"
+                            }`}
+                            title="Instagram Sesini Çöz"
+                          >
+                            {resolvingInstagramTrackId === track.id ? (
+                              <Loader2 className="h-3.5 w-3.5 text-[#fd1d1d] animate-spin" />
+                            ) : (
+                              <InstagramIcon className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+
+                          {/* Favori */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleFavorite(playbackTrack)}
+                            className={`h-7 w-7 hover:bg-white/5 cursor-pointer rounded-lg transition-colors duration-200 ${
+                              isFavorite(track.id) ? "text-red-500" : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            <Heart className="h-3.5 w-3.5" fill={isFavorite(track.id) ? "currentColor" : "none"} />
+                          </Button>
+
+                          {/* Koleksiyona Ekle */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (!session) {
+                                setIsLoginOpen(true);
+                                return;
+                              }
+                              setSelectedTrackToAddToCollection(playbackTrack);
+                              setIsAddToCollectionOpen(true);
+                            }}
+                            className="h-7 w-7 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all duration-200 cursor-pointer"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -364,7 +608,7 @@ export default function DiscoverTab({
           /* ========================================================================= */
           /* 1. GRID GÖRÜNÜMÜ                                                          */
           /* ========================================================================= */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-[fadeIn_0.5s_ease-out]">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 animate-[fadeIn_0.5s_ease-out]">
             {sortedTracks.map((track) => {
               const favRecord = favorites.find(f => f.spotifyId === track.id);
               const hasCustomTikTok = !!favRecord?.customPreviewUrl || !!resolvedCache[track.id]?.customPreviewUrl;
@@ -385,60 +629,66 @@ export default function DiscoverTab({
               return (
                 <Card 
                   key={track.id} 
-                  className={`relative overflow-hidden group border transition-all duration-300 ${
+                  className={`relative overflow-hidden group border transition-[background-color,border-color,box-shadow] duration-200 flex flex-col justify-between p-2.5 rounded-2xl ${
                     active 
-                      ? "bg-white/10 border-primary/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]" 
-                      : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/8 hover:shadow-[0_10px_25px_rgba(0,0,0,0.3)]"
+                      ? "bg-white/10 border-primary/50 shadow-[0_0_15px_rgba(168,85,247,0.2)]" 
+                      : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/8 hover:shadow-[0_8px_20px_rgba(0,0,0,0.3)]"
                   }`}
                 >
-                  <div className="flex items-center gap-4 relative z-10">
+                  <div className="relative z-10 flex flex-col gap-2.5 flex-1">
                     {/* Albüm Resmi ve Play Buton Hover */}
-                    <div className="relative h-16 w-16 rounded-xl overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-300 shadow-lg border border-white/5 bg-black/20">
+                    <div className="relative aspect-square w-full rounded-xl overflow-hidden shadow border border-white/5 bg-black/20">
                       <img
                         src={track.albumArt}
                         alt={track.title}
                         className="h-full w-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1.5px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-300">
+                      
+                      {/* Glassy Badges over Image */}
+                      {badge && (
+                        <div className="absolute top-1.5 right-1.5 flex gap-1 z-20">
+                          <span className="px-1.5 py-0.5 text-[7px] font-black rounded bg-black/75 text-white border border-white/10 select-none">
+                            {badge.lang}
+                          </span>
+                          <span className="px-1.5 py-0.5 text-[7px] font-black rounded bg-primary/90 text-white border border-primary/20 select-none">
+                            {badge.genre}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Play Button Overlay */}
+                      <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
                         <button
                           onClick={() => playTrack(playbackTrack)}
-                          className="h-9 w-9 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-transform cursor-pointer shadow-[0_4px_12px_rgba(168,85,247,0.4)]"
+                          className="h-9 w-9 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 hover:scale-105 transition-transform cursor-pointer shadow-[0_4px_12px_rgba(168,85,247,0.5)]"
                         >
-                          {playing ? <Pause className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4 fill-white translate-x-[1px]" />}
+                          {playing ? <Pause className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4 fill-white translate-x-[0.5px]" />}
                         </button>
                       </div>
+                      
                       {/* Oynatılıyor Dalga Animasyonu */}
                       {playing && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-[3px]">
-                          <span className="w-[3px] bg-primary rounded-full animate-music-bar" style={{ animationDelay: "0.1s" }} />
-                          <span className="w-[3px] bg-cyan-glow rounded-full animate-music-bar" style={{ animationDelay: "0.3s" }} />
-                          <span className="w-[3px] bg-spotify rounded-full animate-music-bar" style={{ animationDelay: "0.5s" }} />
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-[2px]">
+                          <span className="w-[2.5px] h-6 bg-primary rounded-full animate-music-bar" style={{ animationDelay: "0.1s" }} />
+                          <span className="w-[2.5px] h-6 bg-cyan-glow rounded-full animate-music-bar" style={{ animationDelay: "0.3s" }} />
+                          <span className="w-[2.5px] h-6 bg-spotify rounded-full animate-music-bar" style={{ animationDelay: "0.5s" }} />
                         </div>
                       )}
                     </div>
 
                     {/* Şarkı Bilgileri */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-                        {badge && (
-                          <>
-                            <span className="px-1.5 py-0.5 text-[7px] font-black rounded-md bg-white/10 text-white border border-white/10">
-                              {badge.lang}
-                            </span>
-                            <span className="px-1.5 py-0.5 text-[7px] font-black rounded-md bg-primary/20 text-primary border border-primary/20">
-                              {badge.genre}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      <h4 className="font-extrabold text-white text-sm truncate group-hover:text-primary transition-colors font-sans leading-tight">
+                    <div className="min-w-0 flex flex-col justify-center px-1">
+                      <h4 className="font-extrabold text-white text-xs sm:text-sm truncate group-hover:text-primary transition-colors font-sans leading-tight">
                         {track.title}
                       </h4>
-                      <p className="text-xs text-gray-400 truncate mt-0.5">{track.artist}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400 font-medium truncate mt-0.5">{track.artist}</p>
                     </div>
+                  </div>
 
-                    {/* Aksiyon Butonları */}
-                    <div className="flex items-center gap-1.5">
+                  {/* Alt Kontrol Paneli - Daha Kompakt */}
+                  <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between gap-1 relative z-10 px-1">
+                    {/* Sol Grup - Ses Çözücüler */}
+                    <div className="flex items-center gap-1">
                       {/* TikTok Sesi Çöz Butonu */}
                       <Button
                         variant="ghost"
@@ -454,26 +704,26 @@ export default function DiscoverTab({
                           });
                         }}
                         disabled={resolvingTrackId === track.id}
-                        className={`h-9 w-9 rounded-xl transition-all duration-300 relative overflow-hidden border cursor-pointer ${
+                        className={`h-7 w-7 rounded-lg transition-all duration-300 relative overflow-hidden border cursor-pointer ${
                           resolvingTrackId === track.id
                             ? "bg-white/5 border-white/10 text-gray-500 cursor-not-allowed"
                             : hasCustomTikTok 
-                              ? "bg-[#ff0050]/15 border-[#ff0050]/40 text-[#ff0050] shadow-[0_0_12px_rgba(255,0,80,0.25)] animate-pulse-glow hover:border-[#00f2fe]" 
-                              : "bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-[#ff0050]/50 hover:bg-[#ff0050]/10"
+                              ? "bg-[#ff0050]/15 border-[#ff0050]/40 text-[#ff0050] shadow-[0_0_8px_rgba(255,0,80,0.2)] animate-pulse-glow" 
+                              : "bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-[#ff0050]/40 hover:bg-[#ff0050]/5"
                         }`}
-                        title={hasCustomTikTok ? "TikTok Sesi Aktif! Yenilemek için tıklayın." : "TikTok Viral Sesi Otomatik Entegre Et"}
+                        title={hasCustomTikTok ? "TikTok Sesi Aktif!" : "TikTok Sesi Çöz"}
                       >
                         {resolvingTrackId === track.id ? (
-                          <Loader2 className="h-4 w-4 text-[#ff0050] animate-spin" />
+                          <Loader2 className="h-3 w-3 text-[#ff0050] animate-spin" />
                         ) : (
                           <>
                             {hasCustomTikTok && (
-                              <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
+                              <span className="absolute top-0 right-0 flex h-1.5 w-1.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00f2fe] opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#00f2fe]"></span>
                               </span>
                             )}
-                            <TikTokIcon className="h-4 w-4" />
+                            <TikTokIcon className="h-3.5 w-3.5" />
                           </>
                         )}
                       </Button>
@@ -493,40 +743,44 @@ export default function DiscoverTab({
                           });
                         }}
                         disabled={resolvingInstagramTrackId === track.id}
-                        className={`h-9 w-9 rounded-xl transition-all duration-300 relative overflow-hidden border cursor-pointer ${
+                        className={`h-7 w-7 rounded-lg transition-all duration-300 relative overflow-hidden border cursor-pointer ${
                           resolvingInstagramTrackId === track.id
                             ? "bg-white/5 border-white/10 text-gray-500 cursor-not-allowed"
                             : hasCustomInstagram 
-                              ? "bg-gradient-to-tr from-[#833ab4]/10 via-[#fd1d1d]/10 to-[#fcb045]/10 border-[#833ab4]/40 text-[#fd1d1d] shadow-[0_0_12px_rgba(131,58,180,0.25)] animate-pulse-glow hover:border-[#fcb045]" 
-                              : "bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-[#833ab4]/50 hover:bg-[#833ab4]/10"
+                              ? "bg-gradient-to-tr from-[#833ab4]/10 via-[#fd1d1d]/10 to-[#fcb045]/10 border-[#833ab4]/40 text-[#fd1d1d] shadow-[0_0_12px_rgba(131,58,180,0.25)] animate-pulse-glow" 
+                              : "bg-white/5 border-white/10 text-gray-400 hover:text-white hover:border-[#833ab4]/40 hover:bg-[#833ab4]/5"
                         }`}
-                        title={hasCustomInstagram ? "Instagram Reels Sesi Aktif! Yenilemek için tıklayın." : "Instagram Reels Sesi Otomatik Entegre Et"}
+                        title={hasCustomInstagram ? "Instagram Sesi Aktif!" : "Instagram Sesi Çöz"}
                       >
                         {resolvingInstagramTrackId === track.id ? (
-                          <Loader2 className="h-4 w-4 text-[#fd1d1d] animate-spin" />
+                          <Loader2 className="h-3 w-3 text-[#fd1d1d] animate-spin" />
                         ) : (
                           <>
                             {hasCustomInstagram && (
-                              <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
+                              <span className="absolute top-0 right-0 flex h-1.5 w-1.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#fcb045] opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#fcb045]"></span>
                               </span>
                             )}
-                            <InstagramIcon className="h-4 w-4" />
+                            <InstagramIcon className="h-3.5 w-3.5" />
                           </>
                         )}
                       </Button>
+                    </div>
 
+                    {/* Sağ Grup - Kullanıcı Etkileşimi */}
+                    <div className="flex items-center gap-1">
                       {/* Favori */}
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleToggleFavorite(playbackTrack)}
-                        className={`h-8 w-8 hover:bg-white/5 cursor-pointer rounded-xl transition-colors ${
-                          isFavorite(track.id) ? "text-red-500" : "text-gray-400 hover:text-white"
+                        className={`h-7 w-7 hover:bg-white/5 cursor-pointer rounded-lg transition-colors ${
+                          isFavorite(track.id) ? "text-red-500 bg-red-500/10 border border-red-500/20" : "text-gray-400 hover:text-white"
                         }`}
+                        title="Favorile"
                       >
-                        <Heart className="h-4 w-4" fill={isFavorite(track.id) ? "currentColor" : "none"} />
+                        <Heart className="h-3.5 w-3.5" fill={isFavorite(track.id) ? "currentColor" : "none"} />
                       </Button>
 
                       {/* Koleksiyona Ekle */}
@@ -541,9 +795,10 @@ export default function DiscoverTab({
                           setSelectedTrackToAddToCollection(playbackTrack);
                           setIsAddToCollectionOpen(true);
                         }}
-                        className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl cursor-pointer"
+                        className="h-7 w-7 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg border border-transparent hover:border-white/10 cursor-pointer"
+                        title="Koleksiyona Ekle"
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
@@ -613,8 +868,8 @@ export default function DiscoverTab({
 
                     {/* Metadata Bilgileri */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-extrabold text-white text-xs truncate leading-tight group-hover:text-primary transition-colors font-sans">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <h4 className="font-extrabold text-white text-xs truncate leading-tight group-hover:text-primary transition-colors font-sans flex-1 min-w-0">
                           {track.title}
                         </h4>
                         {badge && (

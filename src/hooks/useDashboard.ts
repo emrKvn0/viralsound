@@ -15,7 +15,8 @@ import {
   saveTikTokAudioToFavorite,
   saveTikTokAudioToTrack,
   saveInstagramAudioToFavorite,
-  saveInstagramAudioToTrack
+  saveInstagramAudioToTrack,
+  isDbConnected
 } from "@/app/actions/database";
 import { extractTikTokAudio, autoResolveTikTokAudio, autoResolveInstagramAudio } from "@/app/actions/tiktok";
 
@@ -28,6 +29,7 @@ export function useDashboard(initialSession: any) {
   const [discoverLanguage, setDiscoverLanguage] = useState<"all" | "tr" | "global">("all");
   const [discoverGenre, setDiscoverGenre] = useState<"all" | "pop" | "rap" | "rock" | "dance" | "r&b">("all");
   const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
+  const [searchResults, setSearchResults] = useState<SpotifyTrack[]>([]);
   const [loading, setLoading] = useState(false);
   
   // Son aramalar geçmişi
@@ -215,34 +217,30 @@ export function useDashboard(initialSession: any) {
   const loadUserData = async () => {
     if (!session?.user?.id) return;
     
-    // 1. Koleksiyonları çek
-    const dbCollections = await getCollections(session.user.id);
-    // 2. Favorileri çek
-    const dbFavorites = await getFavorites(session.user.id);
-
-    // Eğer Neon veritabanı bağlantısı yoksa, getCollections [] döndürür.
-    // O zaman yerel depolama (LocalStorage) fallback'ini etkinleştir.
-    const hasDb = process.env.NEXT_PUBLIC_DB_CONNECTED === "true" || dbCollections.length > 0 || dbFavorites.length > 0;
+    // Veritabanı bağlantısını kontrol et
+    const connected = await isDbConnected();
     
-    // Veritabanı sorgulamalarını yerel bellekle de doğrula
-    if (dbCollections.length === 0 && dbFavorites.length === 0) {
-      // LocalStorage'tan verileri çek
+    if (!connected) {
+      // Bağlantı yok, yerel depolamadan yükle
       const localColls = localStorage.getItem(`vsh_colls_${session.user.id}`);
       const localFavs = localStorage.getItem(`vsh_favs_${session.user.id}`);
       
-      if (localColls) {
-        setCollections(JSON.parse(localColls));
-      } else {
+      try {
+        setCollections(localColls ? JSON.parse(localColls) : []);
+      } catch (e) {
         setCollections([]);
       }
 
-      if (localFavs) {
-        setFavorites(JSON.parse(localFavs));
-      } else {
+      try {
+        setFavorites(localFavs ? JSON.parse(localFavs) : []);
+      } catch (e) {
         setFavorites([]);
       }
       setIsLocalMode(true);
     } else {
+      // Bağlantı var, veritabanından yükle
+      const dbCollections = await getCollections(session.user.id);
+      const dbFavorites = await getFavorites(session.user.id);
       setCollections(dbCollections);
       setFavorites(dbFavorites);
       setIsLocalMode(false);
@@ -253,8 +251,10 @@ export function useDashboard(initialSession: any) {
     loadUserData();
   }, [session]);
 
-  // Arama İşlemi (Canlı Arama & Debounce & Dinamik Trend Filtreleme)
+  // Arama İşlemi (Tetikleyici Bazlı & Dinamik Trend Filtreleme)
   useEffect(() => {
+    // Arama boşsa trendleri yükle, doluysa gecikmesiz direkt arat
+    const delay = searchQuery.trim() === "" ? 150 : 0;
     const delayDebounceFn = setTimeout(() => {
       setLoading(true);
       
@@ -274,6 +274,7 @@ export function useDashboard(initialSession: any) {
         
         // Önceki şarkıları sıfırlayarak anlık geçiş hissini güçlendir
         setTracks([]);
+        setSearchResults([]);
 
         const initialQueries = initialHits.map(hit => `${hit.artist} ${hit.title}`);
         
@@ -296,9 +297,9 @@ export function useDashboard(initialSession: any) {
           }
         });
       } else {
-        // Normal arama sorgusu çalıştır
+        // Normal arama sorgusu çalıştır ve searchResults state'ine yaz
         searchTracks(searchQuery).then((res) => {
-          setTracks(res);
+          setSearchResults(res);
           setLoading(false);
           
           // Son aramaları kaydet
@@ -313,7 +314,7 @@ export function useDashboard(initialSession: any) {
           }
         });
       }
-    }, 400);
+    }, delay);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, discoverLanguage, discoverGenre]);
@@ -1260,6 +1261,8 @@ export function useDashboard(initialSession: any) {
     recentSearches,
     setRecentSearches,
     tracks,
+    searchResults,
+    setSearchResults,
     favorites,
     resolvedCache,
     currentTrack,

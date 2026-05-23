@@ -43,6 +43,18 @@
   --animate-pulse-glow: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   --animate-float: float 6s ease-in-out infinite;
   --animate-music-bar: music-bar 1.2s ease-in-out infinite alternate;
+  --animate-fade-in: fade-in 0.2s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes pulse-glow {
@@ -133,20 +145,35 @@ body {
 
 /* Mobile Performance and Styling Optimizations */
 @media (max-width: 768px) {
-  /* GPU yükünü tamamen sıfırlamak için mobilde backdrop-filter'ı kaldırıyoruz */
+  /* GPU yükünü tamamen sıfırlamak için mobilde TÜM elemanlarda backdrop-filter'ı komple kapatıyoruz */
+  *, *::before, *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
   .glass-panel,
   .unified-dark-panel,
   header,
   nav,
   .backdrop-blur-xl,
-  .backdrop-blur-2xl {
+  .backdrop-blur-2xl,
+  .backdrop-blur-md,
+  .backdrop-blur-sm {
     background: rgba(13, 10, 29, 0.98) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     border-color: rgba(255, 255, 255, 0.05) !important;
   }
 
-  /* Mobil dokunmatik cihazlarda kaydırma FPS'ini düşüren hover efektlerini kapat */
+  /* Şarkı kartlarını GPU katmanına taşıyarak boyama (repaint) yükünü tamamen kaldırıp kaydırmayı yağ gibi akıcı hale getiriyoruz */
+  .grid > div,
+  .grid > article,
+  .grid > section {
+    transform: translate3d(0, 0, 0) !important;
+    will-change: transform !important;
+    backface-visibility: hidden !important;
+    -webkit-backface-visibility: hidden !important;
+  }
+
+  /* Mobil dokunmatik cihazlarda kaydırma FPS'ini düşüren hover ve scale efektlerini kapat */
   .glass-panel-hover:hover,
   .glass-panel-hover:active {
     transform: none !important;
@@ -158,14 +185,19 @@ body {
     padding: 0.85rem !important;
   }
   
-  /* Ağır scaling ve dönüşüm efektlerini kapat */
+  /* Ağır resim büyütme, kart ölçekleme ve dönüşüm efektlerini mobilde tamamen iptal et */
   .group-hover\:scale-105:hover, 
   .hover\:scale-105:hover,
-  .group-hover\/item\:text-primary:hover {
+  .group-hover\/item\:text-primary:hover,
+  .group-hover\:scale-\[1\.03\]:hover,
+  .group-hover\:scale-\[1\.03\],
+  .group:hover .group-hover\:scale-\[1\.03\],
+  .group:active .group-hover\:scale-\[1\.03\] {
     transform: none !important;
+    transition: none !important;
   }
 
-  /* Mobilde yoğun CPU yoran parıltı animasyonunu basitleştir */
+  /* Mobilde yoğun CPU yoran parıltı ve pulse animasyonlarını basitleştir */
   .animate-pulse-glow,
   .shadow-\[0_0_15px_rgba\(168\,85\,247\,0\.4\)\] {
     animation: none !important;
@@ -176,6 +208,7 @@ body {
   body, html {
     scroll-behavior: auto !important; /* Dokunmatik kaydırmada ani tepkiler için en iyisi */
     -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
   }
 }
 

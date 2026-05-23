@@ -53,6 +53,10 @@ async function checkDbConnected(): Promise<boolean> {
   }
 }
 
+export async function isDbConnected(): Promise<boolean> {
+  return await checkDbConnected();
+}
+
 // === KOLEKSİYONLAR (PLAYLISTS) ===
 
 export async function getCollections(userId: string): Promise<DBCollection[]> {

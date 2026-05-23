@@ -62,6 +62,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
     recentSearches,
     setRecentSearches,
     tracks,
+    searchResults,
     favorites,
     resolvedCache,
     currentTrack,
@@ -195,7 +196,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
 
         {/* Kullanıcı Giriş Paneli */}
         <div>
-          {session ? (
+          {session && session.user.id !== "guest_user" ? (
             <div className="flex items-center gap-3">
               <div className="hidden lg:flex flex-col text-right">
                 <span className="text-xs font-black text-white">{session.user.name}</span>
@@ -204,61 +205,83 @@ export default function Dashboard({ initialSession }: DashboardProps) {
               <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-primary shadow-[inset_0_0_10px_rgba(168,85,247,0.1)]">
                 <User className="h-4 w-4" />
               </div>
-              <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 text-gray-400 hover:text-red-500 cursor-pointer hover:bg-red-500/10 rounded-xl">
+              <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 text-gray-400 hover:text-red-500 cursor-pointer hover:bg-red-500/10 rounded-xl" title="Çıkış Yap">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
           ) : (
-            <Button
-              variant="primary"
-              onClick={() => setIsLoginOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ff0050] to-[#a855f7] hover:scale-105 transition-all text-xs font-bold uppercase tracking-wider cursor-pointer shadow-[0_4px_15px_rgba(255,0,80,0.2)]"
-            >
-              <LogIn className="h-4 w-4" /> Giriş Yap
-            </Button>
+            <div className="flex items-center gap-2">
+              {session && session.user.id === "guest_user" && (
+                <span className="hidden lg:inline text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-lg font-black uppercase tracking-wider select-none">
+                  Misafir Modu
+                </span>
+              )}
+              <Button
+                variant="primary"
+                onClick={() => setIsLoginOpen(true)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ff0050] to-[#a855f7] hover:scale-105 transition-all text-xs font-bold uppercase tracking-wider cursor-pointer shadow-[0_4px_15px_rgba(255,0,80,0.2)]"
+              >
+                <LogIn className="h-4 w-4" /> Giriş Yap
+              </Button>
+            </div>
           )}
         </div>
       </header>
 
       {/* Mobilde Alt Sekme Menüsü */}
-      <div className="md:hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-40 bg-[#0a0915]/90 border border-white/10 px-3 py-2 rounded-2xl backdrop-blur-lg flex items-center gap-1 shadow-2xl">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 w-full rounded-t-3xl border-t border-white/10 bg-[#080710]/95 backdrop-blur-2xl py-2.5 px-4 pb-safe z-40 flex justify-around items-center shadow-[0_-15px_30px_rgba(0,0,0,0.6)]">
         <button
           onClick={() => setActiveTab("discover")}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold ${
-            activeTab === "discover" ? "bg-primary text-white" : "text-gray-400"
+          className={`flex items-center justify-center transition-all duration-300 ${
+            activeTab === "discover" 
+              ? "bg-primary text-white px-3.5 py-2 rounded-xl text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(168,85,247,0.3)] animate-[fade-in_0.2s_ease-out]" 
+              : "text-gray-400 p-2.5 hover:text-white"
           }`}
         >
-          <Compass className="h-3.5 w-3.5" /> Keşfet
+          <Compass className={activeTab === "discover" ? "h-3.5 w-3.5" : "h-5 w-5"} />
+          {activeTab === "discover" && <span className="animate-[fade-in_0.2s_ease-out] font-bold">Keşfet</span>}
         </button>
+
         <button
           onClick={() => {
             if (!session) setIsLoginOpen(true);
             else setActiveTab("collections");
           }}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold ${
-            activeTab === "collections" ? "bg-primary text-white" : "text-gray-400"
+          className={`flex items-center justify-center transition-all duration-300 ${
+            activeTab === "collections" 
+              ? "bg-primary text-white px-3.5 py-2 rounded-xl text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(168,85,247,0.3)] animate-[fade-in_0.2s_ease-out]" 
+              : "text-gray-400 p-2.5 hover:text-white"
           }`}
         >
-          <ListPlus className="h-3.5 w-3.5" /> Koleksiyonlar
+          <ListPlus className={activeTab === "collections" ? "h-3.5 w-3.5" : "h-5 w-5"} />
+          {activeTab === "collections" && <span className="animate-[fade-in_0.2s_ease-out] font-bold">Koleksiyonlar</span>}
         </button>
+
         <button
           onClick={() => {
             if (!session) setIsLoginOpen(true);
             else setActiveTab("favorites");
           }}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold ${
-            activeTab === "favorites" ? "bg-primary text-white" : "text-gray-400"
+          className={`flex items-center justify-center transition-all duration-300 ${
+            activeTab === "favorites" 
+              ? "bg-primary text-white px-3.5 py-2 rounded-xl text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(168,85,247,0.3)] animate-[fade-in_0.2s_ease-out]" 
+              : "text-gray-400 p-2.5 hover:text-white"
           }`}
         >
-          <FolderHeart className="h-3.5 w-3.5" /> Favoriler
+          <FolderHeart className={activeTab === "favorites" ? "h-3.5 w-3.5" : "h-5 w-5"} />
+          {activeTab === "favorites" && <span className="animate-[fade-in_0.2s_ease-out] font-bold">Favoriler</span>}
         </button>
+
         <button
           onClick={() => setActiveTab("roulette")}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold ${
-            activeTab === "roulette" ? "bg-gradient-to-r from-[#ff0050] to-[#a855f7] text-white" : "text-gray-400"
+          className={`flex items-center justify-center transition-all duration-300 ${
+            activeTab === "roulette" 
+              ? "bg-gradient-to-r from-[#ff0050] to-[#a855f7] text-white px-3.5 py-2 rounded-xl text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(255,0,80,0.3)] animate-[fade-in_0.2s_ease-out]" 
+              : "text-gray-400 p-2.5 hover:text-white"
           }`}
         >
-          <Sparkles className="h-3.5 w-3.5" /> Rulet
+          <Sparkles className={activeTab === "roulette" ? "h-3.5 w-3.5" : "h-5 w-5"} />
+          {activeTab === "roulette" && <span className="animate-[fade-in_0.2s_ease-out] font-bold">Rulet</span>}
         </button>
       </div>
 
@@ -299,6 +322,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
             recentSearches={recentSearches}
             setRecentSearches={setRecentSearches}
             tracks={tracks}
+            searchResults={searchResults}
             favorites={favorites}
             resolvedCache={resolvedCache}
             currentTrack={currentTrack}

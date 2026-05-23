@@ -80,7 +80,7 @@ export default function FavoritesTab({
                       alt={fav.title}
                       className="h-full w-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
                       <button
                         onClick={() => playTrack(formatTrack)}
                         className="h-8 w-8 bg-primary text-white rounded-full flex items-center justify-center cursor-pointer"

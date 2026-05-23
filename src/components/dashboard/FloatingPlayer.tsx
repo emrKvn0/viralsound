@@ -46,7 +46,7 @@ export default function FloatingPlayer({
   };
 
   return (
-    <div className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-7xl z-50 rounded-2xl border border-white/10 bg-[#06050b]/85 backdrop-blur-xl px-6 py-3 md:py-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_40px_rgba(168,85,247,0.12)] hover:border-white/15 transition-all duration-300">
+    <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-7xl z-50 rounded-2xl border border-white/10 bg-[#06050b]/85 backdrop-blur-xl px-6 py-3 md:py-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_40px_rgba(168,85,247,0.12)] hover:border-white/15 transition-all duration-300">
       {/* Sol: Şarkı Ayrıntıları */}
       <div className="w-full md:w-1/4 flex items-center gap-4.5 shrink-0">
         <div className={`relative h-14 w-14 rounded-xl overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.5)] shrink-0 group border border-white/10 transition-all duration-500 ${
