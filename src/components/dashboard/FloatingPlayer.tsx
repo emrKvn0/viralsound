@@ -1,5 +1,5 @@
 import React from "react";
-import { Music, Pause, Play, VolumeX, Volume2, ExternalLink } from "lucide-react";
+import { Music, Pause, Play, VolumeX, Volume2, ExternalLink, Loader2 } from "lucide-react";
 import { SpotifyTrack } from "@/app/actions/spotify";
 import { TikTokIcon, InstagramIcon } from "../icons/BrandIcons";
 
@@ -20,6 +20,7 @@ interface FloatingPlayerProps {
   formatTime: (time: number) => string;
   progressRef: React.RefObject<HTMLDivElement | null>;
   handleProgressBarClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+  resolvingStudioTrackId?: string | null;
 }
 
 export default function FloatingPlayer({
@@ -38,7 +39,8 @@ export default function FloatingPlayer({
   setIsMuted,
   formatTime,
   progressRef,
-  handleProgressBarClick
+  handleProgressBarClick,
+  resolvingStudioTrackId
 }: FloatingPlayerProps) {
   // activeTab'e göre tip belirleme yardımcı fonksiyonu
   const getTrackType = () => {
@@ -84,7 +86,13 @@ export default function FloatingPlayer({
               </span>
             )}
           </div>
-          <p className="text-[11px] text-gray-400 font-bold tracking-wide truncate select-none uppercase">{currentTrack.artist}</p>
+          {resolvingStudioTrackId === currentTrack.id ? (
+            <p className="text-[10px] text-primary font-black tracking-wide truncate select-none uppercase animate-pulse">
+              ⚡ Orijinal Hit Çözümleniyor...
+            </p>
+          ) : (
+            <p className="text-[11px] text-gray-400 font-bold tracking-wide truncate select-none uppercase">{currentTrack.artist}</p>
+          )}
         </div>
       </div>
 
@@ -96,13 +104,21 @@ export default function FloatingPlayer({
           <div className="flex items-center gap-1 bg-white/5 border border-white/5 p-0.5 rounded-xl">
             <button
               onClick={() => playTrack(currentTrack, "spotify")}
-              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1 cursor-pointer ${
+              disabled={resolvingStudioTrackId === currentTrack.id}
+              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1 cursor-pointer disabled:opacity-80 ${
                 audioSourceMode === "spotify"
                   ? "bg-[#1DB954] text-white shadow-[0_2px_8px_rgba(29,185,84,0.3)] scale-[1.02]"
                   : "text-gray-400 hover:text-white hover:bg-white/5"
               }`}
             >
-              Studio
+              {resolvingStudioTrackId === currentTrack.id ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin text-white" />
+                  <span>Çözümleniyor...</span>
+                </>
+              ) : (
+                <span>🎵 Orijinal Hit</span>
+              )}
             </button>
 
             <button
@@ -120,17 +136,17 @@ export default function FloatingPlayer({
                   });
                 }
               }}
-              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 cursor-pointer shrink-0 border ${
                 audioSourceMode === "tiktok"
-                  ? "bg-[#ff0050] text-white shadow-[0_2px_8px_rgba(255,0,80,0.3)] scale-[1.02]"
+                  ? "bg-[#ff0050] border-[#ff0050]/30 text-white shadow-[0_2px_8px_rgba(255,0,80,0.3)] scale-[1.02]"
                   : currentTrack.customPreviewUrl
-                    ? "text-[#ff0050]/80 hover:text-white hover:bg-[#ff0050]/10"
-                    : "text-gray-500 hover:text-gray-300"
+                    ? "text-[#ff0050] bg-[#ff0050]/5 border-[#ff0050]/20 hover:bg-[#ff0050]/15"
+                    : "text-gray-400 border-transparent bg-transparent hover:text-white hover:bg-white/5"
               }`}
               title={currentTrack.customPreviewUrl ? "TikTok Viralini Çal" : "TikTok Viralini Otomatik Çöz ve Çal"}
             >
               <TikTokIcon className="h-3 w-3 shrink-0" />
-              {currentTrack.customPreviewUrl ? "TikTok Hit" : "Çöz (TikTok)"}
+              <span>🎬 TikTok Viral</span>
             </button>
 
             <button
@@ -148,17 +164,17 @@ export default function FloatingPlayer({
                   });
                 }
               }}
-              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 cursor-pointer shrink-0 border ${
                 audioSourceMode === "instagram"
-                  ? "bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] text-white shadow-[0_2px_8px_rgba(253,29,29,0.3)] scale-[1.02]"
+                  ? "bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] border-transparent text-white shadow-[0_2px_8px_rgba(253,29,29,0.3)] scale-[1.02]"
                   : currentTrack.instagramAudioUrl
-                    ? "text-[#fd1d1d]/80 hover:text-white hover:bg-[#833ab4]/10"
-                    : "text-gray-500 hover:text-gray-300"
+                    ? "text-[#fd1d1d] bg-[#833ab4]/5 border-[#833ab4]/20 hover:bg-[#833ab4]/15"
+                    : "text-gray-400 border-transparent bg-transparent hover:text-white hover:bg-white/5"
               }`}
               title={currentTrack.instagramAudioUrl ? "Instagram Reels Sesini Çal" : "Instagram Reels Sesini Otomatik Çöz ve Çal"}
             >
               <InstagramIcon className="h-3 w-3 shrink-0" />
-              {currentTrack.instagramAudioUrl ? "Reels Hit" : "Çöz (Reels)"}
+              <span>📸 Reels Sesi</span>
             </button>
           </div>
 
@@ -212,15 +228,26 @@ export default function FloatingPlayer({
 
       {/* Sağ: Ses Seviyesi & Tiktok Redirect */}
       <div className="w-full md:w-1/4 flex items-center justify-end gap-4 shrink-0">
-        {/* TikTok Redirect Button */}
-        <a
-          href={currentTrack.tiktokUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-4.5 py-2 text-[10px] font-black bg-gradient-to-r from-[#ff0050] to-[#e00045] text-white hover:scale-105 active:scale-95 shadow-[0_4px_12px_rgba(255,0,80,0.3)] hover:shadow-[0_0_20px_rgba(255,0,80,0.6)] transition-all uppercase tracking-wider shrink-0 cursor-pointer rounded-xl"
-        >
-          TikTok'ta Gör <ExternalLink className="h-3 w-3 shrink-0" />
-        </a>
+        {/* TikTok or Instagram Redirect Button */}
+        {audioSourceMode === "instagram" ? (
+          <a
+            href={currentTrack.instagramVideoUrl || `https://www.instagram.com/reels/audio/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-4.5 py-2 text-[10px] font-black bg-gradient-to-r from-[#c13584] to-[#f77737] text-white hover:scale-105 active:scale-95 shadow-[0_4px_12px_rgba(193,53,132,0.3)] hover:shadow-[0_0_20px_rgba(193,53,132,0.6)] transition-all uppercase tracking-wider shrink-0 cursor-pointer rounded-xl animate-[fadeIn_0.3s_ease-out]"
+          >
+            Instagram'da Gör <ExternalLink className="h-3 w-3 shrink-0" />
+          </a>
+        ) : (
+          <a
+            href={currentTrack.tiktokVideoUrl || currentTrack.tiktokUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-4.5 py-2 text-[10px] font-black bg-gradient-to-r from-[#ff0050] to-[#e00045] text-white hover:scale-105 active:scale-95 shadow-[0_4px_12px_rgba(255,0,80,0.3)] hover:shadow-[0_0_20px_rgba(255,0,80,0.6)] transition-all uppercase tracking-wider shrink-0 cursor-pointer rounded-xl"
+          >
+            TikTok'ta Gör <ExternalLink className="h-3 w-3 shrink-0" />
+          </a>
+        )}
 
         {/* Ses Seviyesi */}
         <div className="flex items-center gap-2 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">

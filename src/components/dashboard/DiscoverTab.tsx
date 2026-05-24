@@ -45,6 +45,7 @@ interface DiscoverTabProps {
   resolvingTrackId: string | null;
   handleAutoResolveInstagram: (track: any) => void;
   resolvingInstagramTrackId: string | null;
+  resolvingStudioTrackId?: string | null;
   handleToggleFavorite: (track: any) => void;
   isFavorite: (trackId: string) => boolean;
   session: any;
@@ -74,6 +75,7 @@ export default function DiscoverTab({
   resolvingTrackId,
   handleAutoResolveInstagram,
   resolvingInstagramTrackId,
+  resolvingStudioTrackId,
   handleToggleFavorite,
   isFavorite,
   session,
@@ -314,9 +316,19 @@ export default function DiscoverTab({
                               className="h-full w-full object-cover"
                             />
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                              {playing ? <Pause className="h-4.5 w-4.5 text-white fill-white" /> : <Play className="h-4.5 w-4.5 text-white fill-white translate-x-[0.5px]" />}
+                              {resolvingStudioTrackId === track.id ? (
+                                <Loader2 className="h-4 w-4 text-white animate-spin" />
+                              ) : playing ? (
+                                <Pause className="h-4.5 w-4.5 text-white fill-white" />
+                              ) : (
+                                <Play className="h-4.5 w-4.5 text-white fill-white translate-x-[0.5px]" />
+                              )}
                             </div>
-                            {playing && (
+                            {resolvingStudioTrackId === track.id ? (
+                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+                              </div>
+                            ) : playing && (
                               <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-[2px]">
                                 <span className="w-[2px] h-3 bg-primary rounded-full animate-music-bar" style={{ animationDelay: "0.1s" }} />
                                 <span className="w-[2px] h-3 bg-cyan-glow rounded-full animate-music-bar" style={{ animationDelay: "0.3s" }} />
@@ -660,14 +672,26 @@ export default function DiscoverTab({
                       <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200">
                         <button
                           onClick={() => playTrack(playbackTrack)}
-                          className="h-9 w-9 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 hover:scale-105 transition-transform cursor-pointer shadow-[0_4px_12px_rgba(168,85,247,0.5)]"
+                          disabled={resolvingStudioTrackId === track.id}
+                          className="h-9 w-9 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 hover:scale-105 transition-transform cursor-pointer shadow-[0_4px_12px_rgba(168,85,247,0.5)] disabled:opacity-80"
                         >
-                          {playing ? <Pause className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4 fill-white translate-x-[0.5px]" />}
+                          {resolvingStudioTrackId === track.id ? (
+                            <Loader2 className="h-4 w-4 text-white animate-spin" />
+                          ) : playing ? (
+                            <Pause className="h-4 w-4 fill-white" />
+                          ) : (
+                            <Play className="h-4 w-4 fill-white translate-x-[0.5px]" />
+                          )}
                         </button>
                       </div>
                       
-                      {/* Oynatılıyor Dalga Animasyonu */}
-                      {playing && (
+                      {/* Oynatılıyor Dalga Animasyonu veya Yükleniyor Spinner'ı */}
+                      {resolvingStudioTrackId === track.id ? (
+                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1.5">
+                          <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                          <span className="text-[9px] text-primary font-black uppercase tracking-wider">Hit Aranıyor...</span>
+                        </div>
+                      ) : playing && (
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-[2px]">
                           <span className="w-[2.5px] h-6 bg-primary rounded-full animate-music-bar" style={{ animationDelay: "0.1s" }} />
                           <span className="w-[2.5px] h-6 bg-cyan-glow rounded-full animate-music-bar" style={{ animationDelay: "0.3s" }} />
@@ -848,12 +872,23 @@ export default function DiscoverTab({
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
                         <button
                           onClick={() => playTrack(playbackTrack)}
-                          className="h-7 w-7 bg-primary text-white rounded-full flex items-center justify-center cursor-pointer shadow"
+                          disabled={resolvingStudioTrackId === track.id}
+                          className="h-7 w-7 bg-primary text-white rounded-full flex items-center justify-center cursor-pointer shadow disabled:opacity-80"
                         >
-                          {playing ? <Pause className="h-3.5 w-3.5 fill-white" /> : <Play className="h-3.5 w-3.5 fill-white translate-x-[0.5px]" />}
+                          {resolvingStudioTrackId === track.id ? (
+                            <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+                          ) : playing ? (
+                            <Pause className="h-3.5 w-3.5 fill-white" />
+                          ) : (
+                            <Play className="h-3.5 w-3.5 fill-white translate-x-[0.5px]" />
+                          )}
                         </button>
                       </div>
-                      {playing && (
+                      {resolvingStudioTrackId === track.id ? (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                        </div>
+                      ) : playing && (
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-[2.5px]">
                           <span className="w-[2.5px] h-4 bg-primary rounded-full animate-music-bar" style={{ animationDelay: "0.1s" }} />
                           <span className="w-[2.5px] h-4 bg-cyan-glow rounded-full animate-music-bar" style={{ animationDelay: "0.3s" }} />

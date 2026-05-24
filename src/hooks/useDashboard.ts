@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { signIn, signOut } from "next-auth/react";
-import { searchTracks, searchTracksBulk, SpotifyTrack } from "@/app/actions/spotify";
+import { searchTracks, searchTracksBulk, SpotifyTrack, resolveTrackPreviewUrl } from "@/app/actions/spotify";
 import { TRENDING_HITS } from "@/constants/trendingHits";
 import {
   getCollections,
@@ -19,6 +19,15 @@ import {
   isDbConnected
 } from "@/app/actions/database";
 import { extractTikTokAudio, autoResolveTikTokAudio, autoResolveInstagramAudio } from "@/app/actions/tiktok";
+
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 export function useDashboard(initialSession: any) {
   
@@ -67,6 +76,7 @@ export function useDashboard(initialSession: any) {
   const [tiktokResolveError, setTiktokResolveError] = useState("");
   const [resolvingTrackId, setResolvingTrackId] = useState<string | null>(null);
   const [resolvingInstagramTrackId, setResolvingInstagramTrackId] = useState<string | null>(null);
+  const [resolvingStudioTrackId, setResolvingStudioTrackId] = useState<string | null>(null);
 
   // Çözümlenmiş sesler için önbellek (caching)
   const [resolvedCache, setResolvedCache] = useState<Record<string, {
@@ -165,16 +175,89 @@ export function useDashboard(initialSession: any) {
   const playTrack = (track: SpotifyTrack, sourceMode?: "spotify" | "tiktok" | "instagram") => {
     if (!audioRef.current) return;
 
-    // Hangi ses kaynağını çalacağımızı belirliyoruz
-    const targetSourceMode = sourceMode || 
-      (track.instagramAudioUrl ? "instagram" : 
-      (track.customPreviewUrl ? "tiktok" : "spotify"));
+    // Hangi ses kaynağını çalacağımızı belirliyoruz (Öncelik her zaman stüdyo kalitesindeki Orijinal Hit sesindedir!)
+    let targetSourceMode = sourceMode || "spotify";
 
     let audioSource = track.previewUrl;
     if (targetSourceMode === "tiktok" && track.customPreviewUrl) {
       audioSource = track.customPreviewUrl;
     } else if (targetSourceMode === "instagram" && track.instagramAudioUrl) {
       audioSource = track.instagramAudioUrl;
+    }
+
+    // EĞER SEÇİLEN KAYNAK SESİ BULUNAMAZSA (BOŞSA) AKILLI FALLBACK DEVREYE GİRER!
+    if (!audioSource || audioSource.trim() === "") {
+      if (targetSourceMode === "spotify") {
+        console.log(`[JIT] "${track.title}" için stüdyo kesiti JIT ile çözülüyor...`);
+        setResolvingStudioTrackId(track.id);
+        
+        // JIT Çözücü Server Action Çağır
+        resolveTrackPreviewUrl(track.artist, track.title, track.id)
+          .then((resolvedUrl) => {
+            setResolvingStudioTrackId(null);
+            if (resolvedUrl) {
+              const updatedTrack = {
+                ...track,
+                previewUrl: resolvedUrl
+              };
+              
+              // Eyaletleri güncelle ki UI'da da previewUrl dolu gözüksün
+              setTracks(prev => prev.map(t => t.id === track.id ? { ...t, previewUrl: resolvedUrl } : t));
+              setSearchResults(prev => prev.map(t => t.id === track.id ? { ...t, previewUrl: resolvedUrl } : t));
+              
+              // Çalmaya başla
+              playTrack(updatedTrack, "spotify");
+            } else {
+              // Bulamazsa TikTok fallback'e geç
+              console.log(`[JIT Fallback] "${track.title}" stüdyo kesiti bulunamadı, TikTok fallback devreye giriyor...`);
+              handleFallback();
+            }
+          })
+          .catch((err) => {
+            console.error("JIT Çözümleme Hatası:", err);
+            setResolvingStudioTrackId(null);
+            handleFallback();
+          });
+
+        const handleFallback = () => {
+          if (track.instagramAudioUrl) {
+            playTrack(track, "instagram");
+          } else if (track.customPreviewUrl) {
+            playTrack(track, "tiktok");
+          } else {
+            console.log(`[Oynatıcı Fallback] Arka planda TikTok sesi otomatik çözülüyor...`);
+            handleAutoResolveTikTok({
+              id: track.id,
+              title: track.title,
+              artist: track.artist,
+              type: activeTab === "discover" ? "discover" : activeTab === "favorites" ? "favorite" : "collection",
+              albumArt: track.albumArt,
+              previewUrl: track.previewUrl
+            });
+          }
+        };
+        return;
+      }
+
+      if (track.instagramAudioUrl) {
+        targetSourceMode = "instagram";
+        audioSource = track.instagramAudioUrl;
+      } else if (track.customPreviewUrl) {
+        targetSourceMode = "tiktok";
+        audioSource = track.customPreviewUrl;
+      } else {
+        // Hiçbir çözülmüş ses yoksa ve stüdyo da boşsa, otomatik olarak arka planda TikTok sesini çözüp çalmaya başla!
+        console.log(`[Oynatıcı Fallback] "${track.title}" için stüdyo kesiti bulunamadı, arka planda TikTok sesi otomatik çözülüyor...`);
+        handleAutoResolveTikTok({
+          id: track.id,
+          title: track.title,
+          artist: track.artist,
+          type: activeTab === "discover" ? "discover" : activeTab === "favorites" ? "favorite" : "collection",
+          albumArt: track.albumArt,
+          previewUrl: track.previewUrl
+        });
+        return; // handleAutoResolveTikTok çözünce kendisi playTrack çağıracaktır
+      }
     }
 
     // Eğer şu an çalınan şarkı ile hedef şarkı aynıysa VE çalınan kaynak modu ile hedef kaynak modu aynıysa duraklat/devam et
@@ -219,9 +302,10 @@ export function useDashboard(initialSession: any) {
     
     // Veritabanı bağlantısını kontrol et
     const connected = await isDbConnected();
+    const isGuest = session.user.id === "guest_user";
     
-    if (!connected) {
-      // Bağlantı yok, yerel depolamadan yükle
+    if (!connected || isGuest) {
+      // Bağlantı yok veya misafir kullanıcı, yerel depolamadan yükle
       const localColls = localStorage.getItem(`vsh_colls_${session.user.id}`);
       const localFavs = localStorage.getItem(`vsh_favs_${session.user.id}`);
       
@@ -238,7 +322,7 @@ export function useDashboard(initialSession: any) {
       }
       setIsLocalMode(true);
     } else {
-      // Bağlantı var, veritabanından yükle
+      // Bağlantı var ve gerçek kullanıcı, veritabanından yükle
       const dbCollections = await getCollections(session.user.id);
       const dbFavorites = await getFavorites(session.user.id);
       setCollections(dbCollections);
@@ -268,9 +352,12 @@ export function useDashboard(initialSession: any) {
           filteredHits = filteredHits.filter(h => h.genre === discoverGenre);
         }
         
+        // Rastgele karıştır (Anti-Repeat)
+        const shuffledHits = shuffleArray(filteredHits);
+        
         // İlk 10 şarkıyı paralel olarak iTunes/Spotify üzerinden hızlıca aratıp getir
-        const initialHits = filteredHits.slice(0, 10);
-        const remainingHits = filteredHits.slice(10, 30);
+        const initialHits = shuffledHits.slice(0, 10);
+        const remainingHits = shuffledHits.slice(10, 30);
         
         // Önceki şarkıları sıfırlayarak anlık geçiş hissini güçlendir
         setTracks([]);
@@ -384,7 +471,8 @@ export function useDashboard(initialSession: any) {
   const handleCreateCollection = async () => {
     if (!newCollName || !session?.user?.id) return;
 
-    if (isLocalMode) {
+    const isGuest = session?.user?.id === "guest_user";
+    if (isLocalMode || isGuest) {
       const newColl: DBCollection = {
         id: `coll_${Date.now()}`,
         name: newCollName,
@@ -425,7 +513,8 @@ export function useDashboard(initialSession: any) {
 
   // Koleksiyon Silme
   const handleDeleteCollection = async (collId: string) => {
-    if (isLocalMode) {
+    const isGuest = session?.user?.id === "guest_user";
+    if (isLocalMode || isGuest) {
       const updated = collections.filter(c => c.id !== collId);
       saveLocalCollections(updated);
     } else {
@@ -451,7 +540,8 @@ export function useDashboard(initialSession: any) {
       previewUrl: selectedTrackToAddToCollection.previewUrl
     };
 
-    if (isLocalMode) {
+    const isGuest = session?.user?.id === "guest_user";
+    if (isLocalMode || isGuest) {
       const updated = collections.map(c => {
         if (c.id === collId) {
           // Zaten ekli mi kontrol et
@@ -493,7 +583,8 @@ export function useDashboard(initialSession: any) {
 
   // Şarkıyı Koleksiyondan Çıkarma
   const handleRemoveTrackFromCollection = async (collId: string, spotifyId: string) => {
-    if (isLocalMode) {
+    const isGuest = session?.user?.id === "guest_user";
+    if (isLocalMode || isGuest) {
       const updated = collections.map(c => {
         if (c.id === collId) {
           return {
@@ -538,7 +629,8 @@ export function useDashboard(initialSession: any) {
       previewUrl: track.previewUrl
     };
 
-    if (isLocalMode) {
+    const isGuest = session?.user?.id === "guest_user";
+    if (isLocalMode || isGuest) {
       const exists = favorites.some(f => f.spotifyId === track.id);
       let updated;
       if (exists) {
@@ -594,7 +686,8 @@ export function useDashboard(initialSession: any) {
 
         const { playUrl, videoUrl } = resolved;
 
-        if (isLocalMode) {
+        const isGuest = session?.user?.id === "guest_user";
+        if (isLocalMode || isGuest) {
           if (type === "favorite") {
             const updatedFavs = favorites.map(f => {
               if (f.spotifyId === id) {
@@ -697,7 +790,8 @@ export function useDashboard(initialSession: any) {
 
         const { playUrl } = audioInfo;
 
-        if (isLocalMode) {
+        const isGuest = session?.user?.id === "guest_user";
+        if (isLocalMode || isGuest) {
           if (type === "favorite") {
             const updatedFavs = favorites.map(f => {
               if (f.spotifyId === id) {
@@ -883,7 +977,8 @@ export function useDashboard(initialSession: any) {
       }));
 
       // 2. Veritabanına veya LocalStorage'a kaydet
-      if (isLocalMode) {
+      const isGuest = session?.user?.id === "guest_user";
+      if (isLocalMode || isGuest) {
         if (type === "favorite") {
           const updatedFavs = favorites.map(f => {
             if (f.spotifyId === id) {
@@ -1065,7 +1160,8 @@ export function useDashboard(initialSession: any) {
       }));
 
       // 2. Veritabanına veya LocalStorage'a kaydet
-      if (isLocalMode) {
+      const isGuest = session?.user?.id === "guest_user";
+      if (isLocalMode || isGuest) {
         if (type === "favorite") {
           const updatedFavs = favorites.map(f => {
             if (f.spotifyId === id) {
@@ -1222,7 +1318,7 @@ export function useDashboard(initialSession: any) {
         }));
         
         setRouletteTrack(finalTrack);
-        playTrack(finalTrack, "tiktok");
+        playTrack(finalTrack, "spotify");
       } else {
         // TikTok bulunamazsa varsayılan önizleme (Spotify/iTunes) sesini çal
         playTrack(matchedTrack, "spotify");
@@ -1270,6 +1366,7 @@ export function useDashboard(initialSession: any) {
     playTrack,
     handleAutoResolveTikTok,
     resolvingTrackId,
+    resolvingStudioTrackId,
     handleAutoResolveInstagram,
     resolvingInstagramTrackId,
     handleToggleFavorite,

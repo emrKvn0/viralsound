@@ -60,6 +60,7 @@ export async function isDbConnected(): Promise<boolean> {
 // === KOLEKSİYONLAR (PLAYLISTS) ===
 
 export async function getCollections(userId: string): Promise<DBCollection[]> {
+  if (userId === "guest_user") return [];
   const isDbConnected = await checkDbConnected();
   if (!isDbConnected) return [];
 
@@ -81,6 +82,9 @@ export async function createCollection(
   name: string,
   description?: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
+  if (userId === "guest_user") {
+    return { success: false, error: "GUEST_USER_NOT_ALLOWED" };
+  }
   const isDbConnected = await checkDbConnected();
   if (!isDbConnected) {
     return { success: false, error: "DB_NOT_CONNECTED" };
@@ -210,6 +214,7 @@ export async function removeTrackFromCollection(
 // === FAVORİLER ===
 
 export async function getFavorites(userId: string): Promise<DBFavorite[]> {
+  if (userId === "guest_user") return [];
   const isDbConnected = await checkDbConnected();
   if (!isDbConnected) return [];
 
@@ -229,6 +234,9 @@ export async function toggleFavorite(
   userId: string,
   track: Omit<DBTrack, "id">
 ): Promise<{ success: boolean; isFavorite: boolean; error?: string }> {
+  if (userId === "guest_user") {
+    return { success: false, isFavorite: false, error: "GUEST_USER_NOT_ALLOWED" };
+  }
   const isDbConnected = await checkDbConnected();
   if (!isDbConnected) {
     return { success: false, isFavorite: false, error: "DB_NOT_CONNECTED" };

@@ -72,6 +72,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
     resolvingTrackId,
     handleAutoResolveInstagram,
     resolvingInstagramTrackId,
+    resolvingStudioTrackId,
     handleToggleFavorite,
     isFavorite,
     session,
@@ -332,6 +333,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
             resolvingTrackId={resolvingTrackId}
             handleAutoResolveInstagram={handleAutoResolveInstagram}
             resolvingInstagramTrackId={resolvingInstagramTrackId}
+            resolvingStudioTrackId={resolvingStudioTrackId}
             handleToggleFavorite={handleToggleFavorite}
             isFavorite={isFavorite}
             session={session}
@@ -422,6 +424,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
           formatTime={formatTime}
           progressRef={progressRef}
           handleProgressBarClick={handleProgressBarClick}
+          resolvingStudioTrackId={resolvingStudioTrackId}
         />
       )}
 
