@@ -78,7 +78,7 @@ export default function DashboardModals({
   return (
     <>
       {/* 1. GİRİŞ YAP MODALI */}
-      <Dialog isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} title="ViralSound Hub'a Giriş Yap">
+      <Dialog isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} title="Hit Music'e Giriş Yap">
         <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
           <p className="text-xs text-gray-400 leading-relaxed mb-2">
             Müziklerinizi koleksiyonlar halinde düzenlemek ve favorilerinize eklemek için hemen giriş yapın. Hesabınız yoksa e-posta ve kullanıcı adı yazarak otomatik hesap oluşturabilirsiniz.

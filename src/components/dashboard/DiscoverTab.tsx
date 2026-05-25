@@ -52,6 +52,7 @@ interface DiscoverTabProps {
   setIsLoginOpen: (open: boolean) => void;
   setSelectedTrackToAddToCollection: (track: any) => void;
   setIsAddToCollectionOpen: (open: boolean) => void;
+  playlistCounts?: Record<string, number>;
 }
 
 export default function DiscoverTab({
@@ -81,7 +82,8 @@ export default function DiscoverTab({
   session,
   setIsLoginOpen,
   setSelectedTrackToAddToCollection,
-  setIsAddToCollectionOpen
+  setIsAddToCollectionOpen,
+  playlistCounts = {}
 }: DiscoverTabProps) {
   // Yerel Yönetim State'leri
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -90,8 +92,13 @@ export default function DiscoverTab({
   // Arama için yerel input ve dropdown durumu
   const [inputValue, setInputValue] = useState(searchQuery);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
 
-  // Arama inputu değiştikçe 300ms debounce ile aramayı otomatik tetikle (Gerçek zamanlı öneri)
+  // Ref tanımlamaları
+  const searchContainerRef = React.useRef<HTMLDivElement>(null);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Arama inputu değiştikçe 120ms debounce ile aramayı otomatik tetikle (Gerçek zamanlı öneri)
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(inputValue);
@@ -100,9 +107,43 @@ export default function DiscoverTab({
       } else {
         setIsDropdownOpen(false);
       }
-    }, 300);
+    }, 120);
     return () => clearTimeout(timer);
   }, [inputValue, setSearchQuery]);
+
+  // Click outside logic - Dışarı tıklandığında dropdown kapansın
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // FocusedIndex resetleme
+  React.useEffect(() => {
+    setFocusedIndex(-1);
+  }, [searchResults, isDropdownOpen]);
+
+  // Klavyeyle seçilen elemanı otomatik görüş alanına kaydırma (Auto-scroll)
+  React.useEffect(() => {
+    if (focusedIndex >= 0 && dropdownRef.current) {
+      const activeEl = dropdownRef.current.querySelector(`[data-index="${focusedIndex}"]`);
+      if (activeEl) {
+        activeEl.scrollIntoView({
+          block: "nearest",
+          behavior: "smooth"
+        });
+      }
+    }
+  }, [focusedIndex]);
 
   const handleSearchSubmit = () => {
     setSearchQuery(inputValue);
@@ -164,22 +205,126 @@ export default function DiscoverTab({
   }, [tracks, favorites, resolvedCache]);
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Kahraman Alanı (Hero Section) */}
-      <div className="relative glass-panel rounded-3xl p-8 lg:p-12 border border-white/10 flex flex-col items-center text-center lg:text-left lg:items-start lg:justify-between gap-6">
+    <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
+      {/* SOL SİDEBAR: Canlı Çalma Listeleri */}
+      {searchQuery.trim() === "" && (
+        <aside className="w-full lg:w-1/4 flex flex-col gap-4 sticky lg:top-28 shrink-0">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 select-none font-sans">
+              <Sparkles className="h-4 w-4 text-primary animate-pulse" /> Çalma Listeleri
+            </h3>
+            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider select-none">Canlı</span>
+          </div>
+
+          <div className="flex flex-col gap-2.5">
+            {[
+              {
+                id: "tiktok-viral",
+                title: "TikTok 2026 Viral Hits",
+                description: "TikTok'ta fırtına estiren popüler trend nakaratlar",
+                gradient: "from-[#ff0050]/20 to-[#c5a880]/15",
+                lang: "all" as const,
+                genre: "all" as const,
+                badge: "🔥 VİRAL"
+              },
+              {
+                id: "tr-trends",
+                title: "Türkçe Viral Trendler",
+                description: "Türkiye trendlerindeki en gözde yerli hit kesitleri",
+                gradient: "from-[#c5a880]/20 to-[#8e7556]/15",
+                lang: "tr" as const,
+                genre: "all" as const,
+                badge: "🇹🇷 YERLİ"
+              },
+              {
+                id: "global-charts",
+                title: "Global Chartbusters",
+                description: "Dünya listelerini kasıp kavuran popüler yabancı müzikler",
+                gradient: "from-[#8e7556]/20 to-[#07080a]/15",
+                lang: "global" as const,
+                genre: "all" as const,
+                badge: "🌍 GLOBAL"
+              },
+              {
+                id: "rap-hiphop",
+                title: "Hip-Hop & Rap Nation",
+                description: "Lvbel C5, Travis Scott, Blok3 ve nicesiyle sert ritimler",
+                gradient: "from-[#110c1c]/40 to-[#c5a880]/10",
+                lang: "all" as const,
+                genre: "rap" as const,
+                badge: "🎤 RAP"
+              },
+              {
+                id: "rock-classics",
+                title: "Alternative & Rock Classics",
+                description: "Tom Odell, maNga, Madrigal ve fazlasıyla melankolik esintiler",
+                gradient: "from-[#c5a880]/15 to-[#8e7556]/5",
+                lang: "all" as const,
+                genre: "rock" as const,
+                badge: "🎸 ROCK"
+              }
+            ].map((pl) => {
+              const isActive = discoverLanguage === pl.lang && discoverGenre === pl.genre;
+              const count = playlistCounts[pl.id] || 0;
+              return (
+                <div
+                  key={pl.id}
+                  onClick={() => {
+                    setDiscoverLanguage(pl.lang);
+                    setDiscoverGenre(pl.genre);
+                  }}
+                  className={`relative p-4 rounded border-t border-r border-b border-l-2 transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden group select-none ${
+                    isActive
+                      ? "bg-[#12141a] border-t-white/10 border-r-white/10 border-b-white/10 border-l-[#c5a880] shadow-[0_8px_25px_rgba(0,0,0,0.5)] scale-[1.01]"
+                      : "bg-[#090a0d] border-t-white/5 border-r-white/5 border-b-white/5 border-l-transparent hover:border-l-white/20 hover:bg-[#0e1015]"
+                  }`}
+                >
+                  <div className="relative z-10 flex flex-col gap-1.5">
+                    <span className="self-start text-[8px] font-black uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10 tracking-widest text-[#c5a880]">
+                      {pl.badge}
+                    </span>
+                    <h4 className="font-extrabold text-white text-sm group-hover:text-primary transition-colors leading-snug font-sans">
+                      {pl.title}
+                    </h4>
+                    <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
+                      {pl.description}
+                    </p>
+                  </div>
+
+                  <div className="relative z-10 mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                    <span className="text-[9px] font-extrabold text-gray-500 group-hover:text-gray-300 transition-colors uppercase font-mono tracking-wider">
+                      {loading && isActive ? "YÜKLENİYOR..." : `${count} ADET HİT`}
+                    </span>
+                    <div className={`h-6 w-6 rounded bg-white/5 border border-white/10 flex items-center justify-center transition-all duration-300 group-hover:bg-primary group-hover:text-black group-hover:border-primary ${
+                      isActive ? "bg-primary text-black border-primary" : "text-gray-400"
+                    }`}>
+                      <Play className="h-2.5 w-2.5 fill-current" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </aside>
+      )}
+
+      {/* SAĞ TARAF: Ana Keşfet Akışı */}
+      <div className={`flex-1 flex flex-col gap-6 ${searchQuery.trim() === "" ? "lg:w-3/4" : "w-full"}`}>
+        {/* Kahraman Alanı (Hero Section) */}
+        <div className="relative glass-panel rounded p-8 lg:p-12 border border-white/5 flex flex-col items-center text-center lg:text-left lg:items-start lg:justify-between gap-6">
         {/* Glow'ların dışarı taşmasını önlemek için ayrı bir maskleyici div */}
-        <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none z-0">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-primary/20 via-cyan-glow/10 to-transparent rounded-full blur-3xl" />
-          <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-spotify/15 rounded-full blur-3xl" />
+        <div className="absolute inset-0 rounded overflow-hidden pointer-events-none z-0">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-primary/10 via-[#8e7556]/5 to-transparent rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
         </div>
 
         <div className="max-w-2xl relative z-10 flex flex-col gap-3">
-          <span className="self-center lg:self-start text-xs font-extrabold tracking-widest text-primary uppercase bg-primary/10 px-3 py-1 rounded-full border border-primary/20 animate-[fadeIn_0.4s_ease-out] flex items-center gap-1.5 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
+          <span className="self-center lg:self-start text-[10px] font-extrabold tracking-widest text-primary uppercase bg-primary/10 px-3 py-1 rounded border border-primary/20 animate-[fadeIn_0.4s_ease-out] flex items-center gap-1.5 shadow-[0_0_15px_rgba(197,168,128,0.15)]">
             <Sparkles className="h-3.5 w-3.5 animate-pulse text-primary" /> En Viral Şarkı Kesitleri
           </span>
           <h2 className="text-3xl lg:text-5xl font-black text-white tracking-tight leading-tight">
             Tiktok Trendlerini <br className="hidden md:inline" />
-            <span className="bg-gradient-to-r from-primary via-cyan-glow to-spotify text-transparent bg-clip-text">Spotify Kalitesiyle</span> Dinleyin
+            <span className="bg-gradient-to-r from-white via-gray-100 to-gray-300 text-transparent bg-clip-text">Spotify Kalitesiyle</span> Dinleyin
           </h2>
           <p className="text-sm lg:text-base text-gray-400 leading-relaxed mt-2">
             TikTok üzerinde viral olan en can alıcı şarkı nakaratlarını Spotify yüksek ses kalitesiyle anında dinleyin, kaydedin ve orijinal TikTok/Instagram ses sayfalarına tek tıkla ulaşın.
@@ -187,7 +332,7 @@ export default function DiscoverTab({
         </div>
 
         {/* Canlı Arama Kutusu & Dropdown Menüsü */}
-        <div className="w-full max-w-xl relative z-20 flex flex-col gap-2.5">
+        <div ref={searchContainerRef} className="w-full max-w-xl relative z-20 flex flex-col gap-2.5">
           <div className="relative w-full flex items-center gap-2">
             <div className="relative flex-1 flex items-center">
               <Input
@@ -195,9 +340,37 @@ export default function DiscoverTab({
                 placeholder="Sanatçı, şarkı veya müzik türü yazıp Enter'a basın..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
+                onFocus={() => {
+                  if (inputValue.trim()) {
+                    setIsDropdownOpen(true);
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    handleSearchSubmit();
+                    if (focusedIndex >= 0 && focusedIndex < searchResults.length) {
+                      const track = searchResults[focusedIndex];
+                      const favRecord = favorites.find(f => f.spotifyId === track.id);
+                      const playbackTrack = { 
+                        ...track, 
+                        customPreviewUrl: favRecord?.customPreviewUrl || resolvedCache[track.id]?.customPreviewUrl || undefined, 
+                        tiktokVideoUrl: favRecord?.tiktokVideoUrl || resolvedCache[track.id]?.tiktokVideoUrl || undefined,
+                        instagramAudioUrl: favRecord?.instagramAudioUrl || resolvedCache[track.id]?.instagramAudioUrl || undefined,
+                        instagramVideoUrl: favRecord?.instagramVideoUrl || resolvedCache[track.id]?.instagramVideoUrl || undefined
+                      };
+                      playTrack(playbackTrack);
+                      setIsDropdownOpen(false);
+                    } else {
+                      handleSearchSubmit();
+                    }
+                  } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setIsDropdownOpen(true);
+                    setFocusedIndex(prev => (prev < searchResults.length - 1 ? prev + 1 : 0));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setFocusedIndex(prev => (prev > 0 ? prev - 1 : searchResults.length - 1));
+                  } else if (e.key === "Escape") {
+                    setIsDropdownOpen(false);
                   }
                 }}
                 icon={loading ? <Loader2 className="h-5 w-5 text-primary animate-spin" /> : <Search className="h-5 w-5" />}
@@ -256,7 +429,10 @@ export default function DiscoverTab({
 
           {/* Şarkı Arama Dropdown Önerilenler Paneli */}
           {isDropdownOpen && searchQuery.trim() !== "" && (
-            <div className="absolute top-[52px] left-0 right-0 z-50 bg-[#0c0a1a]/98 border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] max-h-[380px] overflow-y-auto p-3 flex flex-col gap-2 scrollbar-thin animate-[fade-in_0.2s_ease-out]">
+            <div 
+              ref={dropdownRef}
+              className="absolute top-[52px] left-0 right-0 z-50 bg-[#0b081e]/92 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] max-h-[380px] overflow-y-auto p-3 flex flex-col gap-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] animate-[fade-in_0.2s_ease-out]"
+            >
               <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-1 px-1">
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   ÖNERİLEN ARAMA SONUÇLARI ({searchResults.length})
@@ -280,7 +456,7 @@ export default function DiscoverTab({
                 </div>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  {searchResults.map((track) => {
+                  {searchResults.map((track, index) => {
                     const favRecord = favorites.find(f => f.spotifyId === track.id);
                     const hasCustomTikTok = !!favRecord?.customPreviewUrl || !!resolvedCache[track.id]?.customPreviewUrl;
                     const hasCustomInstagram = !!favRecord?.instagramAudioUrl || !!resolvedCache[track.id]?.instagramAudioUrl;
@@ -295,14 +471,18 @@ export default function DiscoverTab({
 
                     const active = currentTrack?.id === track.id;
                     const playing = active && isPlaying;
+                    const isFocused = focusedIndex === index;
 
                     return (
                       <div 
                         key={track.id} 
-                        className={`flex items-center justify-between gap-3 p-2 rounded-xl border transition-[background-color,border-color,box-shadow] duration-200 ${
-                          active 
-                            ? "bg-white/10 border-primary/40 shadow-[0_0_12px_rgba(168,85,247,0.1)]" 
-                            : "bg-white/3 border-white/5 hover:border-white/10 hover:bg-white/5"
+                        data-index={index}
+                        className={`flex items-center justify-between gap-3 p-2 rounded-xl border transition-all duration-75 ease-out ${
+                          isFocused
+                            ? "bg-white/12 border-primary/60 shadow-[0_0_15px_rgba(168,85,247,0.2)] scale-[1.005] ring-1 ring-primary/20"
+                            : active 
+                              ? "bg-white/10 border-primary/40 shadow-[0_0_12px_rgba(168,85,247,0.1)]" 
+                              : "bg-white/3 border-white/5 hover:border-white/15 hover:bg-white/6 hover:scale-[1.002]"
                         }`}
                       >
                         <div 
@@ -447,18 +627,20 @@ export default function DiscoverTab({
         </div>
       </div>
 
+
+
       {/* Dinamik Trend Filtreleme Seçenekleri Paneli */}
       {searchQuery.trim() === "" && (
-        <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.4)] animate-[fadeIn_0.5s_ease-out] flex flex-col lg:flex-row items-center gap-4">
+        <div className="w-full bg-[#0c0e12] border border-white/5 rounded-md p-4 shadow-[0_10px_30px_rgba(0,0,0,0.6)] animate-[fadeIn_0.5s_ease-out] flex flex-col lg:flex-row items-center gap-4">
           {/* Dil Seçimi */}
           <div className="flex-1 flex flex-col gap-1.5 w-full">
             <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center lg:text-left select-none">Dil Seçimi</span>
-            <div className="grid grid-cols-3 gap-1 bg-white/3 border border-white/5 p-0.5 rounded-xl">
+            <div className="grid grid-cols-3 gap-1 bg-white/3 border border-white/5 p-0.5 rounded">
               <button
                 onClick={() => setDiscoverLanguage("all")}
-                className={`py-1.5 rounded-lg text-[10px] font-bold transition-all duration-300 cursor-pointer ${
+                className={`py-1.5 rounded text-[10px] font-bold transition-all duration-300 cursor-pointer ${
                   discoverLanguage === "all"
-                    ? "bg-gradient-to-r from-primary to-purple-600 text-white font-black shadow-[0_2px_8px_rgba(168,85,247,0.2)]"
+                    ? "bg-[#c5a880] text-black font-black shadow-[0_2px_8px_rgba(197,168,128,0.2)]"
                     : "text-gray-400 hover:text-white hover:bg-white/5"
                 }`}
               >
@@ -466,9 +648,9 @@ export default function DiscoverTab({
               </button>
               <button
                 onClick={() => setDiscoverLanguage("tr")}
-                className={`py-1.5 rounded-lg text-[10px] font-bold transition-all duration-300 cursor-pointer ${
+                className={`py-1.5 rounded text-[10px] font-bold transition-all duration-300 cursor-pointer ${
                   discoverLanguage === "tr"
-                    ? "bg-gradient-to-r from-primary to-purple-600 text-white font-black shadow-[0_2px_8px_rgba(168,85,247,0.2)]"
+                    ? "bg-[#c5a880] text-black font-black shadow-[0_2px_8px_rgba(197,168,128,0.2)]"
                     : "text-gray-400 hover:text-white hover:bg-white/5"
                 }`}
               >
@@ -476,9 +658,9 @@ export default function DiscoverTab({
               </button>
               <button
                 onClick={() => setDiscoverLanguage("global")}
-                className={`py-1.5 rounded-lg text-[10px] font-bold transition-all duration-300 cursor-pointer ${
+                className={`py-1.5 rounded text-[10px] font-bold transition-all duration-300 cursor-pointer ${
                   discoverLanguage === "global"
-                    ? "bg-gradient-to-r from-primary to-purple-600 text-white font-black shadow-[0_2px_8px_rgba(168,85,247,0.2)]"
+                    ? "bg-[#c5a880] text-black font-black shadow-[0_2px_8px_rgba(197,168,128,0.2)]"
                     : "text-gray-400 hover:text-white hover:bg-white/5"
                 }`}
               >
@@ -490,14 +672,14 @@ export default function DiscoverTab({
           {/* Müzik Türü Filtresi */}
           <div className="flex-1 flex flex-col gap-1.5 w-full min-w-0">
             <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center lg:text-left select-none">Müzik Türü</span>
-            <div className="grid grid-cols-6 gap-1 bg-white/3 border border-white/5 p-0.5 rounded-xl">
+            <div className="grid grid-cols-6 gap-1 bg-white/3 border border-white/5 p-0.5 rounded">
               {(["all", "pop", "rap", "rock", "dance", "r&b"] as const).map((g) => (
                 <button
                   key={g}
                   onClick={() => setDiscoverGenre(g)}
-                  className={`py-1.5 rounded-lg text-[9px] font-black transition-all duration-300 cursor-pointer uppercase ${
+                  className={`py-1.5 rounded text-[9px] font-black transition-all duration-300 cursor-pointer uppercase ${
                     discoverGenre === g
-                      ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-[0_2px_8px_rgba(168,85,247,0.2)]"
+                      ? "bg-[#c5a880] text-black shadow-[0_2px_8px_rgba(197,168,128,0.2)]"
                       : "text-gray-500 hover:text-white hover:bg-white/5"
                   }`}
                 >
@@ -510,20 +692,20 @@ export default function DiscoverTab({
       )}
 
       {/* Dinamik Trend İstatistik Paneli */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white/2 border border-white/5 rounded-2xl p-4 backdrop-blur-sm animate-[fadeIn_0.6s_ease-out]">
-        <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/3 border border-white/5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white/2 border border-white/5 rounded-md p-4 backdrop-blur-sm animate-[fadeIn_0.6s_ease-out]">
+        <div className="flex flex-col gap-1.5 p-3 rounded bg-white/3 border border-white/5">
           <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest flex items-center gap-1"><Compass className="h-3 w-3 text-primary" /> Toplam Şarkı</span>
           <h4 className="text-xl font-black text-white">{stats.total} <span className="text-xs text-gray-400 font-bold">Adet</span></h4>
         </div>
-        <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/3 border border-white/5">
-          <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest flex items-center gap-1"><TrendingUp className="h-3 w-3 text-[#ff0050]" /> Trend Skoru</span>
-          <h4 className="text-xl font-black text-cyan-glow">%{stats.popularityScore} <span className="text-xs text-gray-400 font-bold">Popüler</span></h4>
+        <div className="flex flex-col gap-1.5 p-3 rounded bg-white/3 border border-white/5">
+          <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest flex items-center gap-1"><TrendingUp className="h-3 w-3 text-primary" /> Trend Skoru</span>
+          <h4 className="text-xl font-black text-primary">%{stats.popularityScore} <span className="text-xs text-gray-400 font-bold">Popüler</span></h4>
         </div>
-        <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/3 border border-white/5">
+        <div className="flex flex-col gap-1.5 p-3 rounded bg-white/3 border border-white/5">
           <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest flex items-center gap-1"><TikTokIcon className="h-3 w-3 text-white" /> Çözülen TikTok</span>
           <h4 className="text-xl font-black text-white">{stats.resolvedTikTok} <span className="text-xs text-gray-400 font-bold">Viral Ses</span></h4>
         </div>
-        <div className="flex flex-col gap-1.5 p-3 rounded-xl bg-white/3 border border-white/5">
+        <div className="flex flex-col gap-1.5 p-3 rounded bg-white/3 border border-white/5">
           <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest flex items-center gap-1"><Activity className="h-3 w-3 text-spotify" /> Müzik Kalitesi</span>
           <h4 className="text-xl font-black text-spotify">320kbps <span className="text-xs text-gray-400 font-bold">Premium</span></h4>
         </div>
@@ -1013,6 +1195,7 @@ export default function DiscoverTab({
             })}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

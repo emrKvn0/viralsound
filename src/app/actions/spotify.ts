@@ -393,3 +393,112 @@ export async function searchTracksBulk(queries: string[]): Promise<SpotifyTrack[
     return [];
   }
 }
+
+// iTunes Live RSS Charts üzerinden tam otomatik, gerçek zamanlı trend/çalma listeleri çeken Server Action
+export async function fetchDynamicTrending(
+  language: "all" | "tr" | "global",
+  genre: "all" | "pop" | "rap" | "rock" | "dance" | "r&b"
+): Promise<SpotifyTrack[]> {
+  try {
+    const feeds = [];
+    if (language === "tr" || language === "all") {
+      feeds.push({ url: "https://itunes.apple.com/tr/rss/topsongs/limit=50/json", country: "tr" });
+    }
+    if (language === "global" || language === "all") {
+      feeds.push({ url: "https://itunes.apple.com/us/rss/topsongs/limit=50/json", country: "global" });
+    }
+
+    const responses = await Promise.all(
+      feeds.map(feed => 
+        fetch(feed.url, { next: { revalidate: 1800 } }) // 30 dakika önbellekle
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => ({ data, country: feed.country }))
+          .catch(() => ({ data: null, country: feed.country }))
+      )
+    );
+
+    let allEntries: any[] = [];
+    for (const res of responses) {
+      if (res.data && res.data.feed && res.data.feed.entry) {
+        const entries = Array.isArray(res.data.feed.entry) ? res.data.feed.entry : [res.data.feed.entry];
+        allEntries = [...allEntries, ...entries.map((entry: any) => ({ ...entry, country: res.country }))];
+      }
+    }
+
+    // "all" modunda TR ve Global şarkıları fermuar (interleave) şeklinde karıştır
+    if (language === "all" && responses.length > 1) {
+      const trEntries = allEntries.filter(e => e.country === "tr");
+      const glEntries = allEntries.filter(e => e.country === "global");
+      const mixed = [];
+      const maxLength = Math.max(trEntries.length, glEntries.length);
+      for (let i = 0; i < maxLength; i++) {
+        if (trEntries[i]) mixed.push(trEntries[i]);
+        if (glEntries[i]) mixed.push(glEntries[i]);
+      }
+      allEntries = mixed;
+    }
+
+    // Türlere (genre) göre filtrele
+    if (genre !== "all") {
+      const genreLower = genre.toLowerCase();
+      allEntries = allEntries.filter(entry => {
+        const cat = (entry.category?.attributes?.term || "").toLowerCase();
+        if (genreLower === "pop") return cat.includes("pop");
+        if (genreLower === "rap") return cat.includes("rap") || cat.includes("hip-hop") || cat.includes("hip hop");
+        if (genreLower === "rock") return cat.includes("rock") || cat.includes("alternative");
+        if (genreLower === "dance") return cat.includes("dance") || cat.includes("electronic") || cat.includes("house");
+        if (genreLower === "r&b") return cat.includes("r&b") || cat.includes("soul") || cat.includes("rb");
+        return true;
+      });
+    }
+
+    // entry'leri SpotifyTrack formatına eşleştir
+    const formatted: SpotifyTrack[] = allEntries.map(entry => {
+      const title = entry["im:name"]?.label || "Bilinmeyen Şarkı";
+      const artist = entry["im:artist"]?.label || "Bilinmeyen Sanatçı";
+      
+      const images = entry["im:image"] || [];
+      const albumArt = images[images.length - 1]?.label?.replace("170x170bb.png", "400x400bb.png") || 
+                       "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop";
+
+      let previewUrl = "";
+      const links = entry.link || [];
+      // Array olup olmadığını kontrol et
+      if (Array.isArray(links)) {
+        const previewLink = links.find((l: any) => l.attributes?.["im:assetType"] === "preview");
+        if (previewLink) {
+          previewUrl = previewLink.attributes.href;
+        }
+      } else if (links.attributes?.["im:assetType"] === "preview") {
+        previewUrl = links.attributes.href;
+      }
+
+      const id = entry.id?.attributes?.["im:id"] ? `itunes-${entry.id.attributes["im:id"]}` : `dynamic-${Math.random()}`;
+
+      // Arama yönlendirmesi
+      const sanitizedQuery = encodeURIComponent(`${artist} - ${title}`);
+      const tiktokUrl = `https://www.google.com/search?q=site:tiktok.com/music+${sanitizedQuery}&btnI=I`;
+
+      return {
+        id,
+        title,
+        artist,
+        albumArt,
+        previewUrl,
+        tiktokUrl
+      };
+    });
+
+    // Çift kayıtları (duplicates) önle
+    const seen = new Set<string>();
+    return formatted.filter(t => {
+      if (seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+
+  } catch (error) {
+    console.error("Dinamik trend yükleme hatası:", error);
+    return [];
+  }
+}

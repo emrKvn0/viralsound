@@ -3,7 +3,7 @@ import Dashboard from "@/components/Dashboard";
 
 // Sayfa Başlığı ve Meta veriler (SEO)
 export const metadata = {
-  title: "ViralSound Hub - Tiktok Trendlerini Spotify Kalitesiyle Dinleyin",
+  title: "Hit Music - Tiktok Trendlerini Spotify Kalitesiyle Dinleyin",
   description:
     "TikTok üzerinde viral olan şarkı nakaratlarını Spotify yüksek ses kalitesiyle keşfedin, özel koleksiyonlar oluşturun ve favorilerinize kaydedin.",
 };

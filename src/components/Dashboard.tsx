@@ -125,70 +125,137 @@ export default function Dashboard({ initialSession }: DashboardProps) {
     setIsMuted,
     formatTime,
     progressRef,
-    handleProgressBarClick
+    handleProgressBarClick,
+    playlistCounts
   } = useDashboard(initialSession);
+
+  // Tab Bar Kayan Arka Plan Göstergesi (Sliding Indicator)
+  const navRef = React.useRef<HTMLDivElement>(null);
+  const discoverTabRef = React.useRef<HTMLButtonElement>(null);
+  const collectionsTabRef = React.useRef<HTMLButtonElement>(null);
+  const favoritesTabRef = React.useRef<HTMLButtonElement>(null);
+  const rouletteTabRef = React.useRef<HTMLButtonElement>(null);
+
+  const [indicatorStyle, setIndicatorStyle] = React.useState<React.CSSProperties>({
+    left: 0,
+    width: 0,
+    height: 0,
+    opacity: 0
+  });
+
+  React.useEffect(() => {
+    const updateIndicator = () => {
+      let activeEl: HTMLButtonElement | null = null;
+      if (activeTab === "discover") activeEl = discoverTabRef.current;
+      else if (activeTab === "collections") activeEl = collectionsTabRef.current;
+      else if (activeTab === "favorites") activeEl = favoritesTabRef.current;
+      else if (activeTab === "roulette") activeEl = rouletteTabRef.current;
+
+      if (activeEl && navRef.current) {
+        const navRect = navRef.current.getBoundingClientRect();
+        const activeRect = activeEl.getBoundingClientRect();
+        
+        setIndicatorStyle({
+          left: activeRect.left - navRect.left,
+          width: activeRect.width,
+          height: activeRect.height,
+          opacity: 1
+        });
+      }
+    };
+
+    // DOM'un tam render edilmesini garanti edelim
+    const timer = setTimeout(updateIndicator, 50);
+    window.addEventListener("resize", updateIndicator);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", updateIndicator);
+    };
+  }, [activeTab, session]);
 
   return (
     <div className="flex-1 flex flex-col pb-32">
       {/* --- ÜST BAR (NAVBAR) --- */}
-      <header className="sticky top-4 z-40 mx-auto w-[96%] max-w-7xl rounded-2xl border border-white/10 bg-[#050409]/60 backdrop-blur-xl px-6 py-3 flex items-center justify-between shadow-[0_15px_50px_rgba(0,0,0,0.6),0_0_30px_rgba(168,85,247,0.08)] transition-all duration-300 hover:border-white/15">
+      <header className="sticky top-4 z-40 mx-auto w-[96%] max-w-7xl rounded-md border border-white/5 bg-[#07080a]/80 backdrop-blur-xl px-6 py-3 flex items-center justify-between shadow-[0_20px_40px_rgba(0,0,0,0.8)] transition-all duration-300 hover:border-white/10">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#ff0050] via-[#a855f7] to-[#00f2fe] flex items-center justify-center animate-pulse-glow shadow-[0_0_15px_rgba(168,85,247,0.4)]">
-            <Music className="h-5 w-5 text-white" />
+          <div className="h-10 w-10 rounded-md bg-gradient-to-tr from-[#c5a880] to-[#8e7556] flex items-center justify-center animate-pulse-glow shadow-[0_0_15px_rgba(197,168,128,0.2)]">
+            <Music className="h-5 w-5 text-black" />
           </div>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-1.5 font-sans">
-              <span className="bg-gradient-to-r from-white via-gray-100 to-gray-300 text-transparent bg-clip-text">ViralSound</span>
-              <span className="text-xs bg-gradient-to-r from-[#ff0050] via-[#a855f7] to-[#00f2fe] text-transparent bg-clip-text font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/5 border border-white/5">HUB</span>
+            <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-1.5 font-sans">
+              <span className="bg-gradient-to-r from-white via-gray-100 to-gray-300 text-transparent bg-clip-text">Hit Music</span>
+              <span className="text-[9px] bg-gradient-to-r from-[#c5a880] to-[#e4d5c0] text-transparent bg-clip-text font-black uppercase tracking-widest px-2 py-0.5 rounded bg-white/5 border border-white/5">PRO</span>
             </h1>
             <p className="text-[9px] text-gray-400 font-extrabold uppercase tracking-widest leading-none mt-0.5">Studio & Social Media Hits</p>
           </div>
         </div>
 
         {/* Sekme Değiştirici */}
-        <nav className="hidden md:flex items-center gap-1.5 bg-white/5 border border-white/5 p-1 rounded-xl">
+        <nav ref={navRef} className="hidden md:flex items-center gap-1.5 bg-white/3 border border-white/5 p-1 rounded relative overflow-hidden">
+          {/* Kayan Aktif Arka Plan Göstergesi */}
+          <div 
+            className={`absolute rounded transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none ${
+              activeTab === "roulette" 
+                ? "bg-gradient-to-r from-[#c5a880] to-[#8e7556] shadow-[0_4px_15px_rgba(197,168,128,0.25)]" 
+                : "bg-gradient-to-r from-[#c5a880] to-[#8e7556] shadow-[0_4px_15px_rgba(197,168,128,0.25)]"
+            }`}
+            style={{
+              transform: `translateX(${indicatorStyle.left}px)`,
+              width: `${indicatorStyle.width}px`,
+              height: `${indicatorStyle.height}px`,
+              left: 0,
+              top: `${indicatorStyle.top}px`,
+              opacity: indicatorStyle.opacity,
+            }}
+          />
+
           <button
+            ref={discoverTabRef}
             onClick={() => setActiveTab("discover")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               activeTab === "discover"
-                ? "bg-gradient-to-r from-primary to-purple-600 text-white font-black shadow-[0_4px_15px_rgba(168,85,247,0.3)] scale-[1.02]"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
+                ? "text-white font-black scale-[1.02]"
+                : "text-gray-400 hover:text-white"
             }`}
           >
             <Compass className="h-4 w-4" /> Keşfet
           </button>
           <button
+            ref={collectionsTabRef}
             onClick={() => {
               if (!session) setIsLoginOpen(true);
               else setActiveTab("collections");
             }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               activeTab === "collections"
-                ? "bg-gradient-to-r from-primary to-purple-600 text-white font-black shadow-[0_4px_15px_rgba(168,85,247,0.3)] scale-[1.02]"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
+                ? "text-white font-black scale-[1.02]"
+                : "text-gray-400 hover:text-white"
             }`}
           >
             <ListPlus className="h-4 w-4" /> Koleksiyonlarım
           </button>
           <button
+            ref={favoritesTabRef}
             onClick={() => {
               if (!session) setIsLoginOpen(true);
               else setActiveTab("favorites");
             }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               activeTab === "favorites"
-                ? "bg-gradient-to-r from-primary to-purple-600 text-white font-black shadow-[0_4px_15px_rgba(168,85,247,0.3)] scale-[1.02]"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
+                ? "text-white font-black scale-[1.02]"
+                : "text-gray-400 hover:text-white"
             }`}
           >
             <FolderHeart className="h-4 w-4" /> Favorilerim
           </button>
           <button
+            ref={rouletteTabRef}
             onClick={() => setActiveTab("roulette")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               activeTab === "roulette"
-                ? "bg-gradient-to-r from-[#ff0050] to-[#a855f7] text-white font-black shadow-[0_4px_15px_rgba(255,0,80,0.3)] animate-pulse-glow scale-[1.02]"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
+                ? "text-white font-black scale-[1.02]"
+                : "text-gray-400 hover:text-white"
             }`}
           >
             <Sparkles className="h-4 w-4" /> Viral Rulet
@@ -203,24 +270,24 @@ export default function Dashboard({ initialSession }: DashboardProps) {
                 <span className="text-xs font-black text-white">{session.user.name}</span>
                 <span className="text-[9px] text-gray-400 font-medium">{session.user.email}</span>
               </div>
-              <div className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-primary shadow-[inset_0_0_10px_rgba(168,85,247,0.1)]">
+              <div className="h-9 w-9 rounded bg-white/5 border border-white/10 flex items-center justify-center text-primary shadow-[inset_0_0_10px_rgba(197,168,128,0.1)]">
                 <User className="h-4 w-4" />
               </div>
-              <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 text-gray-400 hover:text-red-500 cursor-pointer hover:bg-red-500/10 rounded-xl" title="Çıkış Yap">
+              <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9 text-gray-400 hover:text-red-500 cursor-pointer hover:bg-red-500/10 rounded" title="Çıkış Yap">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
               {session && session.user.id === "guest_user" && (
-                <span className="hidden lg:inline text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-lg font-black uppercase tracking-wider select-none">
+                <span className="hidden lg:inline text-[10px] text-primary bg-primary/10 border border-primary/20 px-2.5 py-1 rounded font-black uppercase tracking-wider select-none">
                   Misafir Modu
                 </span>
               )}
               <Button
                 variant="primary"
                 onClick={() => setIsLoginOpen(true)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ff0050] to-[#a855f7] hover:scale-105 transition-all text-xs font-bold uppercase tracking-wider cursor-pointer shadow-[0_4px_15px_rgba(255,0,80,0.2)]"
+                className="flex items-center gap-2 px-5 py-2.5 rounded bg-gradient-to-r from-[#c5a880] to-[#8e7556] text-black hover:scale-105 transition-all text-xs font-bold uppercase tracking-wider cursor-pointer shadow-[0_4px_15px_rgba(197,168,128,0.2)]"
               >
                 <LogIn className="h-4 w-4" /> Giriş Yap
               </Button>
@@ -230,12 +297,12 @@ export default function Dashboard({ initialSession }: DashboardProps) {
       </header>
 
       {/* Mobilde Alt Sekme Menüsü */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 w-full rounded-t-3xl border-t border-white/10 bg-[#080710]/95 backdrop-blur-2xl py-2.5 px-4 pb-safe z-40 flex justify-around items-center shadow-[0_-15px_30px_rgba(0,0,0,0.6)]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 w-full rounded-t border-t border-white/5 bg-[#0c0d10]/98 backdrop-blur-2xl py-2.5 px-4 pb-safe z-40 flex justify-around items-center shadow-[0_-15px_30px_rgba(0,0,0,0.8)]">
         <button
           onClick={() => setActiveTab("discover")}
           className={`flex items-center justify-center transition-all duration-300 ${
             activeTab === "discover" 
-              ? "bg-primary text-white px-3.5 py-2 rounded-xl text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(168,85,247,0.3)] animate-[fade-in_0.2s_ease-out]" 
+              ? "bg-primary text-black px-3.5 py-2 rounded text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(197,168,128,0.3)] animate-[fade-in_0.2s_ease-out]" 
               : "text-gray-400 p-2.5 hover:text-white"
           }`}
         >
@@ -250,7 +317,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
           }}
           className={`flex items-center justify-center transition-all duration-300 ${
             activeTab === "collections" 
-              ? "bg-primary text-white px-3.5 py-2 rounded-xl text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(168,85,247,0.3)] animate-[fade-in_0.2s_ease-out]" 
+              ? "bg-primary text-black px-3.5 py-2 rounded text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(197,168,128,0.3)] animate-[fade-in_0.2s_ease-out]" 
               : "text-gray-400 p-2.5 hover:text-white"
           }`}
         >
@@ -265,7 +332,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
           }}
           className={`flex items-center justify-center transition-all duration-300 ${
             activeTab === "favorites" 
-              ? "bg-primary text-white px-3.5 py-2 rounded-xl text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(168,85,247,0.3)] animate-[fade-in_0.2s_ease-out]" 
+              ? "bg-primary text-black px-3.5 py-2 rounded text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(197,168,128,0.3)] animate-[fade-in_0.2s_ease-out]" 
               : "text-gray-400 p-2.5 hover:text-white"
           }`}
         >
@@ -277,7 +344,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
           onClick={() => setActiveTab("roulette")}
           className={`flex items-center justify-center transition-all duration-300 ${
             activeTab === "roulette" 
-              ? "bg-gradient-to-r from-[#ff0050] to-[#a855f7] text-white px-3.5 py-2 rounded-xl text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(255,0,80,0.3)] animate-[fade-in_0.2s_ease-out]" 
+              ? "bg-gradient-to-r from-[#c5a880] to-[#8e7556] text-black px-3.5 py-2 rounded text-xs font-black gap-1.5 shadow-[0_0_12px_rgba(197,168,128,0.3)] animate-[fade-in_0.2s_ease-out]" 
               : "text-gray-400 p-2.5 hover:text-white"
           }`}
         >
@@ -290,9 +357,9 @@ export default function Dashboard({ initialSession }: DashboardProps) {
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 flex flex-col gap-6">
         {/* Neon Bilgi Bannerı (Yerel Mod Fallback Bildirimi) */}
         {isLocalMode && dbNoticeShown && (
-          <div className="relative glass-panel rounded-2xl p-4 bg-purple-500/10 border-purple-500/20 text-gray-200 text-sm flex items-center justify-between animate-float">
+          <div className="relative glass-panel rounded p-4 bg-primary/10 border-primary/20 text-gray-200 text-sm flex items-center justify-between animate-float">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-purple-500/20 flex items-center justify-center text-primary shrink-0">
+              <div className="h-9 w-9 rounded bg-primary/20 flex items-center justify-center text-primary shrink-0">
                 <Info className="h-5 w-5" />
               </div>
               <p className="leading-relaxed pr-6">
@@ -340,6 +407,7 @@ export default function Dashboard({ initialSession }: DashboardProps) {
             setIsLoginOpen={setIsLoginOpen}
             setSelectedTrackToAddToCollection={setSelectedTrackToAddToCollection}
             setIsAddToCollectionOpen={setIsAddToCollectionOpen}
+            playlistCounts={playlistCounts}
           />
         )}
 

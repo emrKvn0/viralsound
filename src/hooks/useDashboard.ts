@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { signIn, signOut } from "next-auth/react";
-import { searchTracks, searchTracksBulk, SpotifyTrack, resolveTrackPreviewUrl } from "@/app/actions/spotify";
+import { searchTracks, searchTracksBulk, SpotifyTrack, resolveTrackPreviewUrl, fetchDynamicTrending } from "@/app/actions/spotify";
 import { TRENDING_HITS } from "@/constants/trendingHits";
 import {
   getCollections,
@@ -94,6 +94,15 @@ export function useDashboard(initialSession: any) {
   const [selectedLanguage, setSelectedLanguage] = useState<"all" | "tr" | "global">("all");
   const [selectedGenre, setSelectedGenre] = useState<"all" | "pop" | "rap" | "rock" | "dance" | "r&b">("all");
   const [rouletteHistory, setRouletteHistory] = useState<string[]>([]);
+  
+  // Canlı çalma listeleri şarkı sayısı
+  const [playlistCounts, setPlaylistCounts] = useState<Record<string, number>>({
+    "tiktok-viral": 0,
+    "tr-trends": 0,
+    "global-charts": 0,
+    "rap-hiphop": 0,
+    "rock-classics": 0
+  });
 
   // Ses Oynatıcı (Audio Player) State'leri
   const [currentTrack, setCurrentTrack] = useState<SpotifyTrack | null>(null);
@@ -101,12 +110,38 @@ export function useDashboard(initialSession: any) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.8);
+  const [volume, setVolume] = useState(0.4);
   const [isMuted, setIsMuted] = useState(false);
 
   // Refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
+  const trendCache = useRef<Record<string, SpotifyTrack[]>>({});
+
+  // Çalma listelerinin şarkı miktarlarını canlı/otomatik hesaplama
+  useEffect(() => {
+    const plDefinitions = [
+      { id: "tiktok-viral", lang: "all" as const, genre: "all" as const },
+      { id: "tr-trends", lang: "tr" as const, genre: "all" as const },
+      { id: "global-charts", lang: "global" as const, genre: "all" as const },
+      { id: "rap-hiphop", lang: "all" as const, genre: "rap" as const },
+      { id: "rock-classics", lang: "all" as const, genre: "rock" as const }
+    ];
+
+    Promise.all(
+      plDefinitions.map(pl => 
+        fetchDynamicTrending(pl.lang, pl.genre)
+          .then(tracks => ({ id: pl.id, count: tracks.length }))
+          .catch(() => ({ id: pl.id, count: 0 }))
+      )
+    ).then(results => {
+      const counts: Record<string, number> = {};
+      results.forEach(res => {
+        counts[res.id] = res.count;
+      });
+      setPlaylistCounts(counts);
+    });
+  }, []);
 
   // Otomatik Misafir Oturumu Entegrasyonu
   useEffect(() => {
@@ -337,52 +372,41 @@ export function useDashboard(initialSession: any) {
 
   // Arama İşlemi (Tetikleyici Bazlı & Dinamik Trend Filtreleme)
   useEffect(() => {
+    // 1. Önbellek Kontrolü: Eğer trend filtresiyse ve önbellekte varsa HİÇ BEKLEMEDEN anında yükle!
+    if (searchQuery.trim() === "") {
+      const cacheKey = `${discoverLanguage}_${discoverGenre}`;
+      if (trendCache.current[cacheKey] && trendCache.current[cacheKey].length > 0) {
+        setTracks(trendCache.current[cacheKey]);
+        setSearchResults([]);
+        setLoading(false);
+        return;
+      }
+    }
+
     // Arama boşsa trendleri yükle, doluysa gecikmesiz direkt arat
-    const delay = searchQuery.trim() === "" ? 150 : 0;
+    const delay = searchQuery.trim() === "" ? 100 : 0;
     const delayDebounceFn = setTimeout(() => {
       setLoading(true);
       
       if (searchQuery.trim() === "") {
-        // discoverLanguage ve discoverGenre filtrelerine uyan trend şarkıları süz
-        let filteredHits = TRENDING_HITS;
-        if (discoverLanguage !== "all") {
-          filteredHits = filteredHits.filter(h => h.language === discoverLanguage);
-        }
-        if (discoverGenre !== "all") {
-          filteredHits = filteredHits.filter(h => h.genre === discoverGenre);
-        }
-        
-        // Rastgele karıştır (Anti-Repeat)
-        const shuffledHits = shuffleArray(filteredHits);
-        
-        // İlk 10 şarkıyı paralel olarak iTunes/Spotify üzerinden hızlıca aratıp getir
-        const initialHits = shuffledHits.slice(0, 10);
-        const remainingHits = shuffledHits.slice(10, 30);
+        const cacheKey = `${discoverLanguage}_${discoverGenre}`;
         
         // Önceki şarkıları sıfırlayarak anlık geçiş hissini güçlendir
         setTracks([]);
         setSearchResults([]);
 
-        const initialQueries = initialHits.map(hit => `${hit.artist} ${hit.title}`);
-        
-        searchTracksBulk(initialQueries).then(validTracks => {
-          setTracks(validTracks);
-          setLoading(false);
+        fetchDynamicTrending(discoverLanguage, discoverGenre)
+          .then(validTracks => {
+            setTracks(validTracks);
+            setLoading(false);
 
-          // Kalan 20 şarkıyı tek bir arka plan toplu isteği (Bulk) ile 600ms sonra yükle
-          const remainingQueries = remainingHits.map(hit => `${hit.artist} ${hit.title}`);
-          if (remainingQueries.length > 0) {
-            setTimeout(() => {
-              searchTracksBulk(remainingQueries).then(validRemaining => {
-                setTracks(prev => {
-                  const existingIds = new Set(prev.map(t => t.id));
-                  const uniqueNew = validRemaining.filter(t => !existingIds.has(t.id));
-                  return [...prev, ...uniqueNew];
-                });
-              });
-            }, 600);
-          }
-        });
+            // Önbelleğe kaydet
+            trendCache.current[cacheKey] = validTracks;
+          })
+          .catch(err => {
+            console.error("Dinamik trend yükleme hatası:", err);
+            setLoading(false);
+          });
       } else {
         // Normal arama sorgusu çalıştır ve searchResults state'ine yaz
         searchTracks(searchQuery).then((res) => {
@@ -1274,61 +1298,69 @@ export function useDashboard(initialSession: any) {
     }
     
     try {
-      // 1. TRENDING_HITS listesinden rastgele bir şarkı seç
-      const randomIndex = Math.floor(Math.random() * TRENDING_HITS.length);
-      const chosen = TRENDING_HITS[randomIndex];
+      // 1. Canlı trend şarkılardan (tracks) veya o esnada boşsa hızlıca iTunes Top listesinden rastgele seç
+      let pool = tracks;
+      if (pool.length === 0) {
+        pool = await fetchDynamicTrending(selectedLanguage, selectedGenre);
+      }
       
-      console.log(`[Viral Rulet] Çevriliyor... Seçilen Hedef: ${chosen.artist} - ${chosen.title}`);
-      
-      // 2. Arka planda Spotify/iTunes üzerinden gerçek metadata bilgilerini ara
-      const searchResults = await searchTracks(`${chosen.artist} ${chosen.title}`);
-      
-      // En az 2.2 saniye dönme efekti hissi yaratmak için yapay gecikme
-      await new Promise(resolve => setTimeout(resolve, 2200));
-      
-      if (!searchResults || searchResults.length === 0) {
+      if (pool.length === 0) {
         setRouletteError("Müzik kütüphanesinden şarkı bilgileri yüklenemedi. Lütfen tekrar çevirmeyi deneyin.");
         setSpinning(false);
         return;
       }
       
-      const matchedTrack = searchResults[0];
+      const randomIndex = Math.floor(Math.random() * pool.length);
+      const chosen = pool[randomIndex];
+      
+      console.log(`[Viral Rulet] Çevriliyor... Seçilen Hedef: ${chosen.artist} - ${chosen.title}`);
+      
+      // 2. En az 2.2 saniye dönme efekti hissi yaratmak için yapay gecikme
+      await new Promise(resolve => setTimeout(resolve, 2200));
+      
+      const matchedTrack = chosen;
       setRouletteTrack(matchedTrack);
       
-      // 3. Arka planda TikTok ses linkini otomatik çözmeyi dene (Kullanıcıya mükemmel deneyim için!)
+      // 3. MÜZİĞİ ANINDA ÇALMAYA BAŞLA! (Stüdyo Kalitesindeki ses 300ms içinde çalmaya başlar)
+      playTrack(matchedTrack, "spotify");
+      
+      // 4. TikTok ses linkini ARKA PLANDA, KULLANICIYI ENGELLEMEDEN çözmeye başla
       setResolvingRouletteTikTok(true);
       
-      const resolved = await autoResolveTikTokAudio(matchedTrack.title, matchedTrack.artist);
-      
-      if (resolved && resolved.playUrl) {
-        const finalTrack: SpotifyTrack = {
-          ...matchedTrack,
-          customPreviewUrl: resolved.playUrl,
-          tiktokVideoUrl: resolved.videoUrl
-        };
-        
-        // UI cache'e kaydet
-        setResolvedCache(prev => ({
-          ...prev,
-          [matchedTrack.id]: {
-            ...prev[matchedTrack.id],
-            customPreviewUrl: resolved.playUrl,
-            tiktokVideoUrl: resolved.videoUrl
+      autoResolveTikTokAudio(matchedTrack.title, matchedTrack.artist)
+        .then((resolved) => {
+          if (resolved && resolved.playUrl) {
+            const finalTrack: SpotifyTrack = {
+              ...matchedTrack,
+              customPreviewUrl: resolved.playUrl,
+              tiktokVideoUrl: resolved.videoUrl
+            };
+            
+            // UI cache'e kaydet (Player'da TikTok butonu aktifleşir)
+            setResolvedCache(prev => ({
+              ...prev,
+              [matchedTrack.id]: {
+                ...prev[matchedTrack.id],
+                customPreviewUrl: resolved.playUrl,
+                tiktokVideoUrl: resolved.videoUrl
+              }
+            }));
+            
+            setRouletteTrack(finalTrack);
           }
-        }));
-        
-        setRouletteTrack(finalTrack);
-        playTrack(finalTrack, "spotify");
-      } else {
-        // TikTok bulunamazsa varsayılan önizleme (Spotify/iTunes) sesini çal
-        playTrack(matchedTrack, "spotify");
-      }
+        })
+        .catch((err) => {
+          console.error("Arka plan TikTok ses çözümü hatası:", err);
+        })
+        .finally(() => {
+          setResolvingRouletteTikTok(false);
+        });
+
     } catch (err: any) {
       console.error("Viral Rulet hatası:", err);
       setRouletteError("Beklenmedik bir hata oluştu. Lütfen tekrar deneyin.");
     } finally {
       setSpinning(false);
-      setResolvingRouletteTikTok(false);
     }
   };
 
@@ -1421,6 +1453,7 @@ export function useDashboard(initialSession: any) {
     setIsMuted,
     formatTime,
     progressRef,
-    handleProgressBarClick
+    handleProgressBarClick,
+    playlistCounts
   };
 }

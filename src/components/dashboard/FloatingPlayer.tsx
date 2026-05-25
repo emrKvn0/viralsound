@@ -253,7 +253,7 @@ export default function FloatingPlayer({
         <div className="flex items-center gap-2 bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl">
           <button
             onClick={() => setIsMuted(!isMuted)}
-            className="text-gray-400 hover:text-white transition-colors cursor-pointer"
+            className="text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0"
           >
             {isMuted || volume === 0 ? <VolumeX className="h-4 w-4 text-red-500" /> : <Volume2 className="h-4 w-4" />}
           </button>
@@ -267,8 +267,11 @@ export default function FloatingPlayer({
               setVolume(parseFloat(e.target.value));
               setIsMuted(false);
             }}
-            className="w-16 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
+            className="w-16 md:w-20 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
           />
+          <span className="text-[10px] font-black text-gray-400 w-8 text-right select-none font-mono shrink-0">
+            {isMuted ? "0%" : `${Math.round(volume * 100)}%`}
+          </span>
         </div>
       </div>
     </div>

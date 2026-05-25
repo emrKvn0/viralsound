@@ -115,7 +115,7 @@ export async function extractTikTokAudio(videoUrl: string): Promise<TikTokAudioI
 // Google Lucky Video Redirect ve LoveTik API kullanarak filigransız MP3 sesini %100 kararlı ve hızlı şekilde çözen eylem
 async function resolveViaLoveTik(title: string, artist: string): Promise<{ playUrl: string; videoUrl: string } | null> {
   const searchQueries = [
-    `site:tiktok.com/music ${artist} ${title}`,
+    `site:tiktok.com inurl:video ${artist} ${title}`,
     `site:tiktok.com ${artist} ${title}`
   ];
 
@@ -145,6 +145,11 @@ async function resolveViaLoveTik(title: string, artist: string): Promise<{ playU
       const targetUrlParam = new URL(location).searchParams.get("q");
       if (!targetUrlParam || !targetUrlParam.includes("tiktok.com")) {
         console.warn(`[LoveTik Çözücü] Yönlendirme adresinden geçerli TikTok URL'si çözümlenemedi:`, location);
+        continue;
+      }
+
+      if (targetUrlParam.includes("/music/")) {
+        console.warn(`[LoveTik Çözücü] Müzik sayfası linki tespit edildi, Lovetik video çözücü bunu desteklemez. Atlanıyor:`, targetUrlParam);
         continue;
       }
 
