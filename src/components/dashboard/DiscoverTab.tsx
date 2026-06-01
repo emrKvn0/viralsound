@@ -207,109 +207,107 @@ export default function DiscoverTab({
   return (
     <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
       {/* SOL SİDEBAR: Canlı Çalma Listeleri */}
-      {searchQuery.trim() === "" && (
-        <aside className="w-full lg:w-1/4 flex flex-col gap-4 sticky lg:top-28 shrink-0">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 select-none font-sans">
-              <Sparkles className="h-4 w-4 text-primary animate-pulse" /> Çalma Listeleri
-            </h3>
-            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider select-none">Canlı</span>
-          </div>
+      <aside className="w-full lg:w-1/4 flex flex-col gap-4 sticky lg:top-28 shrink-0">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 select-none font-sans">
+            <Sparkles className="h-4 w-4 text-primary animate-pulse" /> Çalma Listeleri
+          </h3>
+          <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider select-none">Canlı</span>
+        </div>
 
-          <div className="flex flex-col gap-2.5">
-            {[
-              {
-                id: "tiktok-viral",
-                title: "TikTok 2026 Viral Hits",
-                description: "TikTok'ta fırtına estiren popüler trend nakaratlar",
-                gradient: "from-[#ff0050]/20 to-[#c5a880]/15",
-                lang: "all" as const,
-                genre: "all" as const,
-                badge: "🔥 VİRAL"
-              },
-              {
-                id: "tr-trends",
-                title: "Türkçe Viral Trendler",
-                description: "Türkiye trendlerindeki en gözde yerli hit kesitleri",
-                gradient: "from-[#c5a880]/20 to-[#8e7556]/15",
-                lang: "tr" as const,
-                genre: "all" as const,
-                badge: "🇹🇷 YERLİ"
-              },
-              {
-                id: "global-charts",
-                title: "Global Chartbusters",
-                description: "Dünya listelerini kasıp kavuran popüler yabancı müzikler",
-                gradient: "from-[#8e7556]/20 to-[#07080a]/15",
-                lang: "global" as const,
-                genre: "all" as const,
-                badge: "🌍 GLOBAL"
-              },
-              {
-                id: "rap-hiphop",
-                title: "Hip-Hop & Rap Nation",
-                description: "Lvbel C5, Travis Scott, Blok3 ve nicesiyle sert ritimler",
-                gradient: "from-[#110c1c]/40 to-[#c5a880]/10",
-                lang: "all" as const,
-                genre: "rap" as const,
-                badge: "🎤 RAP"
-              },
-              {
-                id: "rock-classics",
-                title: "Alternative & Rock Classics",
-                description: "Tom Odell, maNga, Madrigal ve fazlasıyla melankolik esintiler",
-                gradient: "from-[#c5a880]/15 to-[#8e7556]/5",
-                lang: "all" as const,
-                genre: "rock" as const,
-                badge: "🎸 ROCK"
-              }
-            ].map((pl) => {
-              const isActive = discoverLanguage === pl.lang && discoverGenre === pl.genre;
-              const count = playlistCounts[pl.id] || 0;
-              return (
-                <div
-                  key={pl.id}
-                  onClick={() => {
-                    setDiscoverLanguage(pl.lang);
-                    setDiscoverGenre(pl.genre);
-                  }}
-                  className={`relative p-4 rounded border-t border-r border-b border-l-2 transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden group select-none ${
-                    isActive
-                      ? "bg-[#12141a] border-t-white/10 border-r-white/10 border-b-white/10 border-l-[#c5a880] shadow-[0_8px_25px_rgba(0,0,0,0.5)] scale-[1.01]"
-                      : "bg-[#090a0d] border-t-white/5 border-r-white/5 border-b-white/5 border-l-transparent hover:border-l-white/20 hover:bg-[#0e1015]"
-                  }`}
-                >
-                  <div className="relative z-10 flex flex-col gap-1.5">
-                    <span className="self-start text-[8px] font-black uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10 tracking-widest text-[#c5a880]">
-                      {pl.badge}
-                    </span>
-                    <h4 className="font-extrabold text-white text-sm group-hover:text-primary transition-colors leading-snug font-sans">
-                      {pl.title}
-                    </h4>
-                    <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
-                      {pl.description}
-                    </p>
-                  </div>
+        <div className="flex flex-col gap-2.5">
+          {[
+            {
+              id: "tiktok-viral",
+              title: "TikTok 2026 Viral Hits",
+              description: "TikTok'ta fırtına estiren popüler trend nakaratlar",
+              gradient: "from-[#ff0050]/20 to-[#c5a880]/15",
+              lang: "all" as const,
+              genre: "all" as const,
+              badge: "🔥 VİRAL"
+            },
+            {
+              id: "tr-trends",
+              title: "Türkçe Viral Trendler",
+              description: "Türkiye trendlerindeki en gözde yerli hit kesitleri",
+              gradient: "from-[#c5a880]/20 to-[#8e7556]/15",
+              lang: "tr" as const,
+              genre: "all" as const,
+              badge: "🇹🇷 YERLİ"
+            },
+            {
+              id: "global-charts",
+              title: "Global Chartbusters",
+              description: "Dünya listelerini kasıp kavuran popüler yabancı müzikler",
+              gradient: "from-[#8e7556]/20 to-[#07080a]/15",
+              lang: "global" as const,
+              genre: "all" as const,
+              badge: "🌍 GLOBAL"
+            },
+            {
+              id: "rap-hiphop",
+              title: "Hip-Hop & Rap Nation",
+              description: "Lvbel C5, Travis Scott, Blok3 ve nicesiyle sert ritimler",
+              gradient: "from-[#110c1c]/40 to-[#c5a880]/10",
+              lang: "all" as const,
+              genre: "rap" as const,
+              badge: "🎤 RAP"
+            },
+            {
+              id: "rock-classics",
+              title: "Alternative & Rock Classics",
+              description: "Tom Odell, maNga, Madrigal ve fazlasıyla melankolik esintiler",
+              gradient: "from-[#c5a880]/15 to-[#8e7556]/5",
+              lang: "all" as const,
+              genre: "rock" as const,
+              badge: "🎸 ROCK"
+            }
+          ].map((pl) => {
+            const isActive = discoverLanguage === pl.lang && discoverGenre === pl.genre;
+            const count = playlistCounts[pl.id] || 0;
+            return (
+              <div
+                key={pl.id}
+                onClick={() => {
+                  setDiscoverLanguage(pl.lang);
+                  setDiscoverGenre(pl.genre);
+                }}
+                className={`relative p-4 rounded border-t border-r border-b border-l-2 transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden group select-none ${
+                  isActive
+                    ? "bg-[#12141a] border-t-white/10 border-r-white/10 border-b-white/10 border-l-[#c5a880] shadow-[0_8px_25px_rgba(0,0,0,0.5)] scale-[1.01]"
+                    : "bg-[#090a0d] border-t-white/5 border-r-white/5 border-b-white/5 border-l-transparent hover:border-l-white/20 hover:bg-[#0e1015]"
+                }`}
+              >
+                <div className="relative z-10 flex flex-col gap-1.5">
+                  <span className="self-start text-[8px] font-black uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10 tracking-widest text-[#c5a880]">
+                    {pl.badge}
+                  </span>
+                  <h4 className="font-extrabold text-white text-sm group-hover:text-primary transition-colors leading-snug font-sans">
+                    {pl.title}
+                  </h4>
+                  <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
+                    {pl.description}
+                  </p>
+                </div>
 
-                  <div className="relative z-10 mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
-                    <span className="text-[9px] font-extrabold text-gray-500 group-hover:text-gray-300 transition-colors uppercase font-mono tracking-wider">
-                      {loading && isActive ? "YÜKLENİYOR..." : `${count} ADET HİT`}
-                    </span>
-                    <div className={`h-6 w-6 rounded bg-white/5 border border-white/10 flex items-center justify-center transition-all duration-300 group-hover:bg-primary group-hover:text-black group-hover:border-primary ${
-                      isActive ? "bg-primary text-black border-primary" : "text-gray-400"
-                    }`}>
-                      <Play className="h-2.5 w-2.5 fill-current" />
-                    </div>
+                <div className="relative z-10 mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                  <span className="text-[9px] font-extrabold text-gray-500 group-hover:text-gray-300 transition-colors uppercase font-mono tracking-wider">
+                    {loading && isActive ? "YÜKLENİYOR..." : `${count} ADET HİT`}
+                  </span>
+                  <div className={`h-6 w-6 rounded bg-white/5 border border-white/10 flex items-center justify-center transition-all duration-300 group-hover:bg-primary group-hover:text-black group-hover:border-primary ${
+                    isActive ? "bg-primary text-black border-primary" : "text-gray-400"
+                  }`}>
+                    <Play className="h-2.5 w-2.5 fill-current" />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </aside>
-      )}
+              </div>
+            );
+          })}
+        </div>
+      </aside>
 
       {/* SAĞ TARAF: Ana Keşfet Akışı */}
-      <div className={`flex-1 flex flex-col gap-6 ${searchQuery.trim() === "" ? "lg:w-3/4" : "w-full"}`}>
+      <div className="flex-1 flex flex-col gap-6 lg:w-3/4 w-full">
         {/* Kahraman Alanı (Hero Section) */}
         <div className="relative glass-panel rounded p-8 lg:p-12 border border-white/5 flex flex-col items-center text-center lg:text-left lg:items-start lg:justify-between gap-6">
         {/* Glow'ların dışarı taşmasını önlemek için ayrı bir maskleyici div */}

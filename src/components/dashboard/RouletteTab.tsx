@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2, Sparkles, Pause, Play, Heart, Plus, Disc } from "lucide-react";
+import { Loader2, Sparkles, Pause, Play, Heart, Plus, Disc, SlidersHorizontal, Globe, Music2, ChevronDown } from "lucide-react";
 import Button from "../ui/button";
 import { SpotifyTrack } from "@/app/actions/spotify";
 import { TikTokIcon } from "../icons/BrandIcons";
@@ -10,8 +10,8 @@ interface RouletteTabProps {
   rouletteError: string;
   selectedLanguage: "all" | "tr" | "global";
   setSelectedLanguage: (lang: "all" | "tr" | "global") => void;
-  selectedGenre: "all" | "pop" | "rap" | "rock" | "dance" | "r&b";
-  setSelectedGenre: (genre: "all" | "pop" | "rap" | "rock" | "dance" | "r&b") => void;
+  selectedGenre: "all" | "pop" | "trap" | "rock" | "dance" | "r&b";
+  setSelectedGenre: (genre: "all" | "pop" | "trap" | "rock" | "dance" | "r&b") => void;
   handleSpinRoulette: () => void;
   playTrack: (track: SpotifyTrack) => void;
   isPlaying: boolean;
@@ -59,63 +59,60 @@ export default function RouletteTab({
         </p>
       </div>
 
-      {/* Kontrol Paneli Kartı */}
-      <div className="w-[94%] max-w-xl bg-white/5 border border-white/10 rounded-3xl p-5 md:p-6 backdrop-blur-md shadow-[0_20px_50px_rgba(0,0,0,0.4)] animate-[slideUp_0.4s_ease-out] flex flex-col gap-5">
-        <div className="flex flex-col md:flex-row items-center gap-4">
-          {/* Dil Seçimi */}
-          <div className="flex-1 flex flex-col gap-2 w-full">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center md:text-left select-none">Dil Seçimi</span>
-            <div className="grid grid-cols-3 gap-1 bg-white/3 border border-white/5 p-1 rounded-xl">
-              <button
-                onClick={() => setSelectedLanguage("all")}
-                className={`py-1.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer ${
-                  selectedLanguage === "all"
-                    ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-[0_4px_12px_rgba(168,85,247,0.3)] font-black"
-                    : "text-gray-400 hover:text-white hover:bg-white/5"
-                }`}
+      {/* Premium Filtreleme Paneli */}
+      <div className="w-[94%] max-w-xl bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-xl shadow-[0_25px_60px_rgba(0,0,0,0.5)] animate-[slideUp_0.4s_ease-out] flex flex-col gap-5 relative overflow-hidden group hover:border-[#ff0050]/20 transition-all duration-500">
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#ff0050] via-[#a855f7] to-[#00f2fe]" />
+        
+        <div className="flex items-center gap-2 mb-1">
+          <div className="h-7 w-7 rounded bg-white/5 border border-white/10 flex items-center justify-center">
+            <SlidersHorizontal className="h-4 w-4 text-[#ff0050]" />
+          </div>
+          <h4 className="text-xs font-black text-white uppercase tracking-widest font-sans">Rulet Filtre Merkezi</h4>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Dil Seçimi Dropdown */}
+          <div className="flex flex-col gap-2 w-full">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5 pl-1 select-none">
+              <Globe className="h-3.5 w-3.5 text-primary" /> DİL SEÇİMİ
+            </label>
+            <div className="relative">
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value as any)}
+                className="w-full bg-[#0a0b0e] border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white uppercase tracking-wider cursor-pointer outline-none hover:border-primary focus:border-primary shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] appearance-none transition-all duration-300"
               >
-                Hepsi
-              </button>
-              <button
-                onClick={() => setSelectedLanguage("tr")}
-                className={`py-1.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer ${
-                  selectedLanguage === "tr"
-                    ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-[0_4px_12px_rgba(168,85,247,0.3)] font-black"
-                    : "text-gray-400 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                Türkçe
-              </button>
-              <button
-                onClick={() => setSelectedLanguage("global")}
-                className={`py-1.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer ${
-                  selectedLanguage === "global"
-                    ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-[0_4px_12px_rgba(168,85,247,0.3)] font-black"
-                    : "text-gray-400 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                Yabancı
-              </button>
+                <option value="all">🌍 HEPSİ (KARIŞIK)</option>
+                <option value="tr">🇹🇷 TÜRKÇE VİRAL</option>
+                <option value="global">🇺🇸 YABANCI HİTLER</option>
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <ChevronDown className="h-4 w-4" />
+              </div>
             </div>
           </div>
 
-          {/* Müzik Türü Filtresi */}
-          <div className="flex-1 flex flex-col gap-2 min-w-0 w-full">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center md:text-left select-none">Müzik Türü</span>
-            <div className="grid grid-cols-6 gap-1 bg-white/3 border border-white/5 p-1 rounded-xl">
-              {(["all", "pop", "rap", "rock", "dance", "r&b"] as const).map((g) => (
-                <button
-                  key={g}
-                  onClick={() => setSelectedGenre(g)}
-                  className={`py-1.5 rounded-lg text-[10px] font-black transition-all duration-300 cursor-pointer uppercase ${
-                    selectedGenre === g
-                      ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-[0_4px_12px_rgba(168,85,247,0.3)]"
-                      : "text-gray-500 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  {g === "all" ? "HPS" : g}
-                </button>
-              ))}
+          {/* Müzik Türü Dropdown */}
+          <div className="flex flex-col gap-2 w-full">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5 pl-1 select-none">
+              <Music2 className="h-3.5 w-3.5 text-primary" /> MÜZİK TÜRÜ
+            </label>
+            <div className="relative">
+              <select
+                value={selectedGenre}
+                onChange={(e) => setSelectedGenre(e.target.value as any)}
+                className="w-full bg-[#0a0b0e] border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white uppercase tracking-wider cursor-pointer outline-none hover:border-primary focus:border-primary shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] appearance-none transition-all duration-300"
+              >
+                <option value="all">💿 TÜM TÜRLER</option>
+                <option value="pop">🎤 POP</option>
+                <option value="trap">🔥 TRAP / RAP</option>
+                <option value="rock">🎸 ROCK / ALT</option>
+                <option value="dance">💃 DANCE / ELEC</option>
+                <option value="r&b">🎹 R&B / SOUL</option>
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <ChevronDown className="h-4 w-4" />
+              </div>
             </div>
           </div>
         </div>

@@ -9,6 +9,31 @@ export interface TikTokAudioInfo {
   coverUrl: string;
 }
 
+// Belirli şarkılar için el ile özel (custom) TikTok/Instagram ses eşleştirmeleri ve yönlendirmeleri
+const CUSTOM_SONG_OVERRIDES: Record<string, { playUrl: string; videoUrl: string }> = {
+  "jackboys - out west": {
+    playUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/6/b/0/b6b6faad9c2bb8bdb96be083b2fbb34d.mp3?hdnea=exp=1780344772~acl=/api/1/1/b/6/b/0/b6b6faad9c2bb8bdb96be083b2fbb34d.mp3*~data=user_id=0,application_id=42~hmac=0c24ca99e7324488661135152e26c0c866390e87879dce880658dc424738122f",
+    videoUrl: "https://www.tiktok.com/music/OUT-WEST-feat-Young-Thug-6774643037286156290"
+  },
+  "out west": {
+    playUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/6/b/0/b6b6faad9c2bb8bdb96be083b2fbb34d.mp3?hdnea=exp=1780344772~acl=/api/1/1/b/6/b/0/b6b6faad9c2bb8bdb96be083b2fbb34d.mp3*~data=user_id=0,application_id=42~hmac=0c24ca99e7324488661135152e26c0c866390e87879dce880658dc424738122f",
+    videoUrl: "https://www.tiktok.com/music/OUT-WEST-feat-Young-Thug-6774643037286156290"
+  },
+  "jackboys & travis scott - out west": {
+    playUrl: "https://cdnt-preview.dzcdn.net/api/1/1/b/6/b/0/b6b6faad9c2bb8bdb96be083b2fbb34d.mp3?hdnea=exp=1780344772~acl=/api/1/1/b/6/b/0/b6b6faad9c2bb8bdb96be083b2fbb34d.mp3*~data=user_id=0,application_id=42~hmac=0c24ca99e7324488661135152e26c0c866390e87879dce880658dc424738122f",
+    videoUrl: "https://www.tiktok.com/music/OUT-WEST-feat-Young-Thug-6774643037286156290"
+  },
+  "kodak black - zeze": {
+    playUrl: "https://cdnt-preview.dzcdn.net/api/1/1/c/1/3/0/c13dd0a2fdbb66c76e910be48ca2db6f.mp3?hdnea=exp=1780344777~acl=/api/1/1/c/1/3/0/c13dd0a2fdbb66c76e910be48ca2db6f.mp3*~data=user_id=0,application_id=42~hmac=999f0f96ce45cc7183a61f3b5d0abef23bc93016fff658a34c3f360e43a7dfb7",
+    videoUrl: "https://www.tiktok.com/music/ZEZE-feat-Travis-Scott-Offset-6611598064974956545"
+  },
+  "zeze": {
+    playUrl: "https://cdnt-preview.dzcdn.net/api/1/1/c/1/3/0/c13dd0a2fdbb66c76e910be48ca2db6f.mp3?hdnea=exp=1780344777~acl=/api/1/1/c/1/3/0/c13dd0a2fdbb66c76e910be48ca2db6f.mp3*~data=user_id=0,application_id=42~hmac=999f0f96ce45cc7183a61f3b5d0abef23bc93016fff658a34c3f360e43a7dfb7",
+    videoUrl: "https://www.tiktok.com/music/ZEZE-feat-Travis-Scott-Offset-6611598064974956545"
+  }
+};
+
+
 // iTunes Search API üzerinden şarkı kesiti (previewUrl) bulma yardımcı eylemi (Stüdyo Kalitesinde Orijinal Hit Nakaratlar İçin)
 async function fetchiTunesPreviewUrl(artist: string, title: string): Promise<string | null> {
   try {
@@ -256,6 +281,23 @@ async function queryTikWM(keywords: string): Promise<{ success: boolean; data?: 
 // Şarkı adı ve sanatçı adıyla TikTok'ta otomatik arama yapıp sesi çözen API entegrasyonu (Akıllı Puanlama Algoritmalı)
 export async function autoResolveTikTokAudio(title: string, artist: string): Promise<{ playUrl: string; videoUrl: string } | null> {
   try {
+    // 0. Özel Eşleştirme (Custom Overrides) Kontrolü
+    const normTitle = (title || "").toLowerCase().trim();
+    const normArtist = (artist || "").toLowerCase().trim();
+
+    // Parantezleri, feat, with ve extra kelimeleri temizleyerek akıllı anahtar kelime eşleşmesi sağlayalım
+    const cleanTitle = normTitle.split("(")[0].split("-")[0].split("feat.")[0].split("with")[0].trim();
+    const cleanArtist = normArtist.split("feat.")[0].split("&")[0].split("with")[0].trim();
+
+    const key1 = `${cleanArtist} - ${cleanTitle}`;
+    const key2 = cleanTitle;
+
+    const override = CUSTOM_SONG_OVERRIDES[key1] || CUSTOM_SONG_OVERRIDES[key2];
+    if (override) {
+      console.log(`[TikTok Özel Eşleşme] "${artist} - ${title}" için el ile atanmış ses kullanılıyor.`);
+      return override;
+    }
+
     // 1. Google + LoveTik hızlı ve kararlı zinciri dene (%99 başarı oranı, 0ms 502 hatası)
     const loveTikResult = await resolveViaLoveTik(title, artist);
     if (loveTikResult) {
@@ -412,6 +454,23 @@ async function fetchStudioPreviewUrl(artist: string, title: string): Promise<str
 // Şarkı adı ve sanatçı adıyla Instagram Reels için bağımsız olarak Instagram Reels üzerinden arama yapıp çözümlenmesini sağlayan API
 export async function autoResolveInstagramAudio(title: string, artist: string): Promise<{ playUrl: string; videoUrl: string } | null> {
   try {
+    // 0. Özel Eşleştirme (Custom Overrides) Kontrolü
+    const normTitle = (title || "").toLowerCase().trim();
+    const normArtist = (artist || "").toLowerCase().trim();
+
+    // Parantezleri, feat, with ve extra kelimeleri temizleyerek akıllı anahtar kelime eşleşmesi sağlayalım
+    const cleanTitle = normTitle.split("(")[0].split("-")[0].split("feat.")[0].split("with")[0].trim();
+    const cleanArtist = normArtist.split("feat.")[0].split("&")[0].split("with")[0].trim();
+
+    const key1 = `${cleanArtist} - ${cleanTitle}`;
+    const key2 = cleanTitle;
+
+    const override = CUSTOM_SONG_OVERRIDES[key1] || CUSTOM_SONG_OVERRIDES[key2];
+    if (override) {
+      console.log(`[Instagram Özel Eşleşme] "${artist} - ${title}" için el ile atanmış ses kullanılıyor.`);
+      return override;
+    }
+
     const query = `site:instagram.com/reels/audio ${artist} ${title}`;
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&btnI=I`;
 

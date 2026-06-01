@@ -92,7 +92,7 @@ export function useDashboard(initialSession: any) {
   const [rouletteError, setRouletteError] = useState("");
   const [resolvingRouletteTikTok, setResolvingRouletteTikTok] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<"all" | "tr" | "global">("all");
-  const [selectedGenre, setSelectedGenre] = useState<"all" | "pop" | "rap" | "rock" | "dance" | "r&b">("all");
+  const [selectedGenre, setSelectedGenre] = useState<"all" | "pop" | "trap" | "rock" | "dance" | "r&b">("all");
   const [rouletteHistory, setRouletteHistory] = useState<string[]>([]);
   
   // Canlı çalma listeleri şarkı sayısı
@@ -1298,10 +1298,27 @@ export function useDashboard(initialSession: any) {
     }
     
     try {
-      // 1. Canlı trend şarkılardan (tracks) veya o esnada boşsa hızlıca iTunes Top listesinden rastgele seç
-      let pool = tracks;
+      // 1. Rulet için seçilen filtreleri kullanarak bağımsız, filtrelenmiş şarkı havuzunu getir
+      let pool = await fetchDynamicTrending(selectedLanguage, selectedGenre);
+      
+      // Akıllı Arama Tabanlı Fallback: Seçilen müzik türünde iTunes listesinde anlık şarkı yoksa, 
+      // arama motorumuz üzerinden o türe ait gerçek ve popüler şarkıları çekerek havuzu doldur!
       if (pool.length === 0) {
-        pool = await fetchDynamicTrending(selectedLanguage, selectedGenre);
+        console.warn(`[Rulet Fallback] "${selectedGenre}" türünde iTunes listesinde şarkı bulunamadı. Arama motorundan tür şarkıları çekiliyor...`);
+        
+        let searchKeyword = "trending hits";
+        if (selectedGenre !== "all") {
+          const genreTerm = selectedGenre === "trap" ? "trap hip hop" : selectedGenre;
+          if (selectedLanguage === "tr") {
+            searchKeyword = `türkçe ${genreTerm}`;
+          } else if (selectedLanguage === "global") {
+            searchKeyword = `us ${genreTerm} hits`;
+          } else {
+            searchKeyword = `${genreTerm} hits`;
+          }
+        }
+        
+        pool = await searchTracks(searchKeyword);
       }
       
       if (pool.length === 0) {
@@ -1310,8 +1327,25 @@ export function useDashboard(initialSession: any) {
         return;
       }
       
-      const randomIndex = Math.floor(Math.random() * pool.length);
-      const chosen = pool[randomIndex];
+      // Mükerrer (üst üste tekrar eden) şarkıları engellemek için akıllı geçmiş filtresi
+      let filteredPool = pool.filter(t => !rouletteHistory.includes(t.id));
+      
+      // Eğer tüm havuz dinlendiyse, geçmişi temizleyip havuzu sıfırla
+      if (filteredPool.length === 0) {
+        filteredPool = pool;
+      }
+
+      const randomIndex = Math.floor(Math.random() * filteredPool.length);
+      const chosen = filteredPool[randomIndex];
+      
+      // Geçmişe ekle (Son 15 şarkının tekrarlanması engellenir)
+      setRouletteHistory(prev => {
+        const updated = [...prev.filter(id => id !== chosen.id), chosen.id];
+        if (updated.length > 15) {
+          return updated.slice(updated.length - 15);
+        }
+        return updated;
+      });
       
       console.log(`[Viral Rulet] Çevriliyor... Seçilen Hedef: ${chosen.artist} - ${chosen.title}`);
       
