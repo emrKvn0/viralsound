@@ -9,7 +9,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Hit Music - 15-30s Hit Preview Aggregator",
+  title: "ViralSound - 15-30s Hit Preview Aggregator",
   description: "TikTok üzerinde popüler şarkı kesitlerini keşfedin ve yönetin.",
 };
 
